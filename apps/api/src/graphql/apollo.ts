@@ -18,6 +18,12 @@ export function createApolloServer(httpServer: HttpServer): ApolloServer<GraphQL
     resolvers,
     // The landing page / schema introspection is a development affordance, not a production one.
     introspection: !isProduction,
+    /**
+     * Stack traces carry absolute paths from the machine that threw, so they are a leak, not a
+     * detail. Apollo already defaults to omitting them outside development, but this is stated
+     * rather than inherited: in development the trace points straight at the resolver that threw.
+     */
+    includeStacktraceInErrorResponses: !isProduction,
     plugins: [ApolloServerPluginDrainHttpServer({ httpServer })],
   })
 }

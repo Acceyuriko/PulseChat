@@ -136,6 +136,27 @@ The two things in this package look similar but have opposite audiences: a contr
 
 The failure mode is quiet, which is the real argument: Vite **externalises** the Node built-ins with a warning and the build still succeeds. The bundle simply carries dead references until something calls them. The fix was one `exports` entry and one changed import specifier, and the browser bundle dropped ~1.4 kB.
 
+### D19 — Timestamp paths are declared in the schema, but never `required`
+
+`createdAt` / `updatedAt` are written into every schema explicitly, even though `timestamps: true` already maintains them. This is for TypeScript: `InferSchemaType` cannot see the paths the timestamps option adds at runtime, so a document read back from MongoDB would look like it has no `createdAt` — and the DTO mappers, which require a `Date`, would refuse it.
+
+They must **not** be marked `required`. Mongoose runs validators _before_ the timestamps plugin writes the values, so `required: true` fails every insert with a message that points nowhere near the cause:
+
+```
+ValidationError: User validation failed: updatedAt: Path `updatedAt` is required.,
+createdAt: Path `createdAt` is required.
+```
+
+Measured rather than assumed — of the three plausible spellings, only the two without `required` work:
+
+| Declaration                                   | Insert                                      |
+| --------------------------------------------- | ------------------------------------------- |
+| `{ type: Date, required: true }` + timestamps | fails validation                            |
+| `{ type: Date }` + timestamps                 | works, values stamped by Mongoose           |
+| path omitted + timestamps                     | works, but the document type loses the keys |
+
+Worth recording _how_ this was found: the scaffold was written, linted, type-checked and committed before a MongoDB was ever reachable, so every test either avoided the database or skipped itself. The model layer had never been executed. Connecting a real database was the first honest test of it.
+
 ---
 
 ## Version landmines

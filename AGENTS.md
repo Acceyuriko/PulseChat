@@ -65,6 +65,11 @@ The API and `packages/shared` are native ESM with `moduleResolution: NodeNext`, 
 
 GraphQL errors use `SCREAMING_SNAKE` codes in `extensions.code`, created with `graphQLError()` from `apps/api/src/graphql/errors.ts`. Never surface a raw driver or internal message to the client.
 
+### Models
+
+- Declare `createdAt` / `updatedAt` in the schema so `InferSchemaType` keeps the keys, but **never with `required: true`**: Mongoose runs validators before the timestamps plugin writes the values, so every insert fails with "Path `createdAt` is required". See D19 in `docs/DECISIONS.md`.
+- When a timestamp needs a value other than "now" — the seed aligning a conversation with its last message — go through `Model.collection` (`updateOne`), because Mongoose stamps its own `updatedAt` on any update it performs.
+
 ### Realtime
 
 - Every write goes through GraphQL. socket.io is server-to-client push only.

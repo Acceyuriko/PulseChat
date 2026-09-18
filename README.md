@@ -178,6 +178,8 @@ There is no password flow. A user id travels in the `x-user-id` header (HTTP) an
 
 GraphQL errors carry a `SCREAMING_SNAKE` code in `extensions.code` (`UNAUTHENTICATED`, `FORBIDDEN`, `NOT_FOUND`, `BAD_USER_INPUT`). Clients branch on the code, never on the message. See `apps/api/src/graphql/errors.ts`.
 
+In production, that code is all the client gets: stack traces and schema introspection are development-only affordances, both set explicitly in `apps/api/src/graphql/apollo.ts` rather than inherited from a default. Verified by running the server with `NODE_ENV=production` — the response carries `extensions: { code }` and nothing else.
+
 ### Generated code
 
 `apps/api/src/generated/` and `apps/web/src/gql/` are produced by GraphQL Codegen and **committed**, so a fresh clone runs without an extra build step. They are excluded from ESLint and Prettier. Never edit them by hand — run `pnpm codegen`.
@@ -209,7 +211,7 @@ In the order they are planned:
 2. **Unread counts** — a per-participant read cursor on `Conversation`, and an `unread:changed` event.
 3. **Quote replies** — a `replyTo` reference on `Message` and the expected UI affordance.
 4. **Mentions** — a `mentions` list on `Message`, validated against the conversation's participants.
-5. **More tests** — 20 cases exist today (16 that run without a database: identity parsing, DTO mapping, error codes, the identity switcher; plus 4 integration cases). Each feature above lands with its own, rather than adding a test pass at the end.
+5. **More tests** — 23 cases exist today (16 that run without a database: identity parsing, DTO mapping, error codes, the identity switcher; plus 7 integration cases that exercise the resolver → Mongoose → document round trip against a real MongoDB). Each feature above lands with its own, rather than adding a test pass at the end.
 
 ---
 

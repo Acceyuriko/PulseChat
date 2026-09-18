@@ -2,15 +2,16 @@ import { Schema, model } from 'mongoose'
 
 /**
  * See the note in `user.ts`: the timestamp paths are declared explicitly so the inferred document
- * type matches what Mongoose actually returns.
+ * type matches what Mongoose actually returns, but without `required` — validators run before the
+ * timestamps plugin writes the values.
  */
 const messageSchema = new Schema(
   {
     conversationId: { type: Schema.Types.ObjectId, ref: 'Conversation', required: true },
     senderId: { type: Schema.Types.ObjectId, ref: 'User', required: true },
     body: { type: String, required: true, trim: true, maxlength: 4_000 },
-    createdAt: { type: Date, required: true },
-    updatedAt: { type: Date, required: true },
+    createdAt: { type: Date },
+    updatedAt: { type: Date },
   },
   { timestamps: true, collection: 'messages' },
 )

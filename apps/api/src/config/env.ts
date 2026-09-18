@@ -23,7 +23,7 @@ export const env = {
   nodeEnv: readString('NODE_ENV', 'development'),
   port: readPort('PORT', 4000),
   mongodbUri: readString('MONGODB_URI', 'mongodb://127.0.0.1:27017/pulsechat'),
-  corsOrigin: readString('CORS_ORIGIN', 'http://localhost:5173'),
+  corsOrigin: readString('CORS_ORIGIN', 'http://localhost:4173'),
 } as const
 
 export const isProduction = env.nodeEnv === 'production'

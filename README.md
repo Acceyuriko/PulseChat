@@ -138,9 +138,11 @@ pnpm seed
 pnpm dev
 ```
 
-- Web app: <http://localhost:5173>
+- Web app: <http://localhost:4173>
 - GraphQL endpoint, with the Apollo landing page in development: <http://localhost:4000/graphql>
 - Health check: <http://localhost:4000/health>
+
+The web app deliberately uses **4173 rather than Vite's default 5173**, which every other Vite project on a developer's machine also claims. `strictPort` is on, so a collision fails loudly instead of silently moving to the next port and contradicting the API's `CORS_ORIGIN`. To use a different port, set `WEB_PORT` in `apps/web/.env` and `CORS_ORIGIN` in `apps/api/.env` to match.
 
 Identity is stored in **`sessionStorage`**, so it is per tab. Pick a user, and their conversations appear.
 

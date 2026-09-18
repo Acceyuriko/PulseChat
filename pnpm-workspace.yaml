@@ -1,0 +1,16 @@
+packages:
+  - 'apps/*'
+  - 'packages/*'
+
+# pnpm >= 10 blocks dependency lifecycle scripts unless they are explicitly allowed here.
+# - esbuild: required by vite / vitest / tsx to link the platform binary.
+# - @apollo/protobufjs: Apollo Server's protobuf runtime.
+allowBuilds:
+  esbuild: true
+  '@apollo/protobufjs': true
+
+# Written by pnpm: these versions were published too recently for the default
+# `minimumReleaseAge` supply-chain gate, so they are explicitly opted in.
+minimumReleaseAgeExclude:
+  - dotenv@18.0.0
+  - prettier@3.9.8

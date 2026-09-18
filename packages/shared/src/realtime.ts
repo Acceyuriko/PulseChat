@@ -1,0 +1,59 @@
+/**
+ * The realtime contract between `apps/api` (socket.io server) and `apps/web` (socket.io client).
+ *
+ * Architecture note (see docs/DECISIONS.md, D4): GraphQL owns every write, socket.io only pushes
+ * server -> client notifications. Keeping the event names in one place is what stops the two apps
+ * from drifting into hard-coded string literals on both sides.
+ */
+
+export interface SocketReadyPayload {
+  /** The identity the socket was authenticated as. */
+  userId: string
+  /** Rooms the socket joined, e.g. `user:<id>`. */
+  joinedRooms: string[]
+}
+
+export interface SocketErrorPayload {
+  /** Same SCREAMING_SNAKE convention the GraphQL layer uses for `extensions.code`. */
+  code: string
+  message: string
+}
+
+/** Events the server emits to clients. */
+export interface ServerToClientEvents {
+  'socket:ready': (payload: SocketReadyPayload) => void
+  'socket:error': (payload: SocketErrorPayload) => void
+}
+
+/** Events clients emit to the server. */
+export interface ClientToServerEvents {
+  'conversation:subscribe': (conversationId: string) => void
+  'conversation:unsubscribe': (conversationId: string) => void
+}
+
+type ServerEventName = keyof ServerToClientEvents
+type ClientEventName = keyof ClientToServerEvents
+
+/**
+ * Named constants for the events declared above. The `satisfies` clause makes the build fail if a
+ * constant stops matching an event name in the interfaces, so the two can never drift apart.
+ */
+export const SOCKET_EVENTS = {
+  ready: 'socket:ready',
+  error: 'socket:error',
+  conversationSubscribe: 'conversation:subscribe',
+  conversationUnsubscribe: 'conversation:unsubscribe',
+} as const satisfies Record<string, ServerEventName | ClientEventName>
+
+/** Key used to carry the identity in the socket.io handshake (`io(url, { auth: { userId } })`). */
+export const SOCKET_AUTH_USER_ID_KEY = 'userId'
+
+/** Every socket for a given user joins this room, so the API can push to all of their tabs. */
+export function userRoom(userId: string): string {
+  return `user:${userId}`
+}
+
+/** Room for a single conversation, joined only after a participation check. */
+export function conversationRoom(conversationId: string): string {
+  return `conversation:${conversationId}`
+}

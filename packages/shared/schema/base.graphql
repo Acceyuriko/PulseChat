@@ -1,0 +1,9 @@
+"""
+An ISO-8601 timestamp on the wire, a JavaScript `Date` on the server.
+"""
+scalar DateTime
+
+type Query {
+  "Liveness probe for the GraphQL layer itself."
+  health: String!
+}

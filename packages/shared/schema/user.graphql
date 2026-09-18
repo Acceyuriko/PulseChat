@@ -1,0 +1,17 @@
+type User {
+  id: ID!
+  displayName: String!
+  avatarUrl: String
+  createdAt: DateTime!
+}
+
+extend type Query {
+  """
+  The user behind the current request identity.
+  Fails with error code `UNAUTHENTICATED` when no identity was supplied.
+  """
+  me: User!
+
+  "Every seeded user. Feeds the frontend identity switcher."
+  users: [User!]!
+}

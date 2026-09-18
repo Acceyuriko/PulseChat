@@ -1,0 +1,26 @@
+type Conversation {
+  id: ID!
+  title: String!
+  participants: [User!]!
+  lastMessage: Message
+  createdAt: DateTime!
+  updatedAt: DateTime!
+}
+
+type Message {
+  id: ID!
+  conversationId: ID!
+  body: String!
+  sender: User!
+  createdAt: DateTime!
+}
+
+extend type Query {
+  "Conversations the current user takes part in, most recently active first."
+  conversations: [Conversation!]!
+
+  conversation(id: ID!): Conversation
+
+  "Messages of a conversation, newest first."
+  messages(conversationId: ID!, limit: Int = 50): [Message!]!
+}

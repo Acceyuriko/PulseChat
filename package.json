@@ -1,0 +1,54 @@
+{
+  "name": "pulsechat",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Monorepo scaffold for PulseChat - a realtime chat app (React + GraphQL + MongoDB + socket.io).",
+  "license": "MIT",
+  "type": "module",
+  "packageManager": "pnpm@11.8.0",
+  "engines": {
+    "node": ">=20.19.0"
+  },
+  "scripts": {
+    "build:shared": "pnpm --filter @pulsechat/shared build",
+    "codegen": "pnpm --filter @pulsechat/api codegen && pnpm --filter @pulsechat/web codegen",
+    "dev": "pnpm build:shared && pnpm -r --parallel dev",
+    "dev:api": "pnpm --filter @pulsechat/api dev",
+    "dev:web": "pnpm --filter @pulsechat/web dev",
+    "build": "pnpm -r build",
+    "start:api": "pnpm --filter @pulsechat/api start",
+    "seed": "pnpm --filter @pulsechat/api seed",
+    "typecheck": "pnpm build:shared && pnpm codegen && pnpm -r typecheck",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "test": "pnpm -r test",
+    "verify": "pnpm typecheck && pnpm lint && pnpm format:check && pnpm test",
+    "prepare": "husky"
+  },
+  "devDependencies": {
+    "@commitlint/cli": "^21.2.2",
+    "@commitlint/config-conventional": "^21.2.2",
+    "@eslint/js": "^10.0.1",
+    "eslint": "^10.10.0",
+    "eslint-config-prettier": "^10.1.8",
+    "eslint-plugin-react-hooks": "^7.1.1",
+    "eslint-plugin-react-refresh": "^0.5.7",
+    "husky": "^9.1.7",
+    "lint-staged": "^17.5.1",
+    "prettier": "^3.9.8",
+    "prettier-plugin-tailwindcss": "^0.8.1",
+    "typescript": "~6.0.3",
+    "typescript-eslint": "^8.70.0"
+  },
+  "lint-staged": {
+    "*.{ts,tsx}": [
+      "eslint --fix",
+      "prettier --write"
+    ],
+    "*.{json,md,yml,yaml,css,html,graphql,mjs}": [
+      "prettier --write"
+    ]
+  }
+}

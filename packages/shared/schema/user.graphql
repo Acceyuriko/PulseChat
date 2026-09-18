@@ -2,6 +2,8 @@ type User {
   id: ID!
   displayName: String!
   avatarUrl: String
+  "Job title shown as the mention dropdown subtitle, e.g. `CTO@Apple`. Null when unknown."
+  title: String
   createdAt: DateTime!
 }
 

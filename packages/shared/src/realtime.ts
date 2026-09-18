@@ -6,6 +6,43 @@
  * from drifting into hard-coded string literals on both sides.
  */
 
+/** The message shape carried over the socket — mirrors the `Message` type in the SDL. */
+export interface RealtimeMessage {
+  id: string
+  conversationId: string
+  body: string
+  sender: {
+    id: string
+    displayName: string
+    avatarUrl: string | null
+    title: string | null
+  }
+  replyTo: RealtimeQuoteSnapshot | null
+  createdAt: string
+  deletedAt: string | null
+}
+
+export interface RealtimeQuoteSnapshot {
+  messageId: string
+  senderId: string
+  senderDisplayName: string
+  bodyExcerpt: string
+  createdAt: string
+}
+
+/**
+ * The conversation row as the list renders it.
+ *
+ * `unreadCount` is computed **by the server, per recipient** — a client-side `+1` drifts across
+ * tabs, reconnects and deletes, and the list has to stay correct while you are looking elsewhere.
+ */
+export interface RealtimeConversationActivity {
+  conversationId: string
+  unreadCount: number
+  lastActivityAt: string
+  preview: string
+}
+
 export interface SocketReadyPayload {
   /** The identity the socket was authenticated as. */
   userId: string
@@ -19,10 +56,29 @@ export interface SocketErrorPayload {
   message: string
 }
 
+export interface MessageCreatedPayload {
+  conversationId: string
+  message: RealtimeMessage
+}
+
+export interface MessageDeletedPayload {
+  conversationId: string
+  messageId: string
+  /**
+   * The conversation after the delete. Deleting the newest message moves both `lastMessage` and
+   * `lastActivityAt` backwards and can reorder the list, so the corrected view travels with the
+   * event rather than being guessed at from the id alone.
+   */
+  conversation: RealtimeConversationActivity
+}
+
 /** Events the server emits to clients. */
 export interface ServerToClientEvents {
   'socket:ready': (payload: SocketReadyPayload) => void
   'socket:error': (payload: SocketErrorPayload) => void
+  'message:created': (payload: MessageCreatedPayload) => void
+  'message:deleted': (payload: MessageDeletedPayload) => void
+  'conversation:activity': (payload: RealtimeConversationActivity) => void
 }
 
 /** Events clients emit to the server. */
@@ -41,6 +97,9 @@ type ClientEventName = keyof ClientToServerEvents
 export const SOCKET_EVENTS = {
   ready: 'socket:ready',
   error: 'socket:error',
+  messageCreated: 'message:created',
+  messageDeleted: 'message:deleted',
+  conversationActivity: 'conversation:activity',
   conversationSubscribe: 'conversation:subscribe',
   conversationUnsubscribe: 'conversation:unsubscribe',
 } as const satisfies Record<string, ServerEventName | ClientEventName>

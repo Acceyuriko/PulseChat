@@ -9,6 +9,9 @@ import type { CodegenConfig } from '@graphql-codegen/cli'
  * The `mappers` option maps GraphQL object types onto the DTOs in `src/graphql/mappers.ts`. That is
  * what lets `Conversation.lastMessage` be served by a field resolver instead of being carried on
  * every conversation object.
+ *
+ * `ConversationMember` and `QuoteSnapshot` are mapped too, so their nested `user` / scalar fields
+ * keep their real types rather than degrading to the generated placeholder shapes.
  */
 const config: CodegenConfig = {
   schema: '../../packages/shared/schema/**/*.graphql',
@@ -21,6 +24,8 @@ const config: CodegenConfig = {
           User: '../graphql/mappers.js#UserDTO',
           Message: '../graphql/mappers.js#MessageDTO',
           Conversation: '../graphql/mappers.js#ConversationDTO',
+          ConversationMember: '../graphql/mappers.js#ConversationMemberDTO',
+          QuoteSnapshot: '../graphql/mappers.js#QuoteSnapshotDTO',
         },
         scalars: {
           DateTime: 'Date',

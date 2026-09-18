@@ -9,7 +9,7 @@ import { Schema, model } from 'mongoose'
  * plugin writes the values, so `required: true` here makes every insert fail with
  * "Path `createdAt` is required" — with no hint that the schema is the problem.
  */
-const timestamps = {
+export const timestampPaths = {
   createdAt: { type: Date },
   updatedAt: { type: Date },
 } as const
@@ -18,7 +18,9 @@ const userSchema = new Schema(
   {
     displayName: { type: String, required: true, trim: true, maxlength: 80 },
     avatarUrl: { type: String, default: null },
-    ...timestamps,
+    // Feeds the mention dropdown subtitle (`CTO@Apple`). Optional: not every user has one.
+    title: { type: String, default: null, trim: true, maxlength: 80 },
+    ...timestampPaths,
   },
   { timestamps: true, collection: 'users' },
 )

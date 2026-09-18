@@ -15,6 +15,10 @@
       "types": "./dist/realtime.d.ts",
       "default": "./dist/realtime.js"
     },
+    "./markdown": {
+      "types": "./dist/markdown.d.ts",
+      "default": "./dist/markdown.js"
+    },
     "./schema": {
       "types": "./dist/schema.d.ts",
       "default": "./dist/schema.js"

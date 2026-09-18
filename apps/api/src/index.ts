@@ -16,8 +16,13 @@ async function main(): Promise<void> {
   const apolloServer = createApolloServer(httpServer)
   await apolloServer.start()
 
-  httpServer.on('request', createApp(apolloServer))
-  attachRealtime(httpServer, { corsOrigin: env.corsOrigin })
+  /**
+   * The realtime handle is created first so the GraphQL layer can be handed it: mutations emit
+   * through `context.emitter` after a successful write, and socket.io itself never writes.
+   */
+  const { emitter } = attachRealtime(httpServer, { corsOrigin: env.corsOrigin })
+
+  httpServer.on('request', createApp(apolloServer, { emitter }))
 
   await new Promise<void>((resolve) => {
     httpServer.listen({ port: env.port }, resolve)

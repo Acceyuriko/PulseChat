@@ -7,13 +7,30 @@ import { Schema, model } from 'mongoose'
  */
 const conversationSchema = new Schema(
   {
-    title: { type: String, required: true, trim: true, maxlength: 120 },
-    participantIds: {
-      type: [{ type: Schema.Types.ObjectId, ref: 'User' }],
+    kind: { type: String, required: true, enum: ['CHANNEL', 'DM'] },
+    /**
+     * Required for a `CHANNEL`, null for a `DM`. The client labels a DM with the other member's
+     * display name, so storing a title for it would be a second, competing source of truth.
+     */
+    title: { type: String, default: null, trim: true, maxlength: 120 },
+    /**
+     * Replaces the old `participantIds: [ObjectId]`. The read cursor lives next to the membership
+     * so the unread count is derivable from one document instead of a parallel progress table.
+     */
+    members: {
+      type: [
+        new Schema(
+          {
+            userId: { type: Schema.Types.ObjectId, ref: 'User', required: true },
+            lastReadAt: { type: Date, default: null },
+          },
+          { _id: false },
+        ),
+      ],
       required: true,
       validate: {
-        validator: (ids: unknown[]) => ids.length > 0,
-        message: 'A conversation needs at least one participant',
+        validator: (members: unknown[]) => members.length > 0,
+        message: 'A conversation needs at least one member',
       },
     },
     createdAt: { type: Date },
@@ -22,7 +39,10 @@ const conversationSchema = new Schema(
   { timestamps: true, collection: 'conversations' },
 )
 
-// Supports `find({ participantIds: me })` in the conversations resolver.
-conversationSchema.index({ participantIds: 1, updatedAt: -1 })
+/**
+ * Backs two hot paths: `find({ 'members.userId': me })` for the list, and the per-conversation
+ * membership check that authorises every read and write.
+ */
+conversationSchema.index({ 'members.userId': 1, updatedAt: -1 })
 
 export const ConversationModel = model('Conversation', conversationSchema)

@@ -10,9 +10,11 @@ Format: `D<n>` = decision, `R<n>` = version landmine to respect.
 
 ### D1 — Built in stages, not in one pass
 
-This stage delivers a complete scaffold plus **one vertical slice**: a user's conversations, read from MongoDB through GraphQL and rendered by the web app. Message sending, unread counts, quote replies and mentions come next, one at a time.
+The first stage delivered a complete scaffold plus **one vertical slice**: a user's conversations, read from MongoDB through GraphQL and rendered by the web app. The second stage added the messaging features on top — sending, unread counts, quote replies, mentions — against a realtime contract that was frozen before any client code was written.
 
-Sending messages was deliberately _not_ sketched in ahead of time — no placeholder `replyTo` / `mentions` fields on the models. Pre-placing schema for features that do not exist yet is how scaffolds turn into guesses.
+Sending messages was deliberately _not_ sketched in ahead of time: for the first stage there were no placeholder `replyTo` / `mentions` fields on the models. Pre-placing schema for features that do not exist yet is how scaffolds turn into guesses. The staging paid for itself twice — the timestamp bug in D19 and the parser hang in D20 were both only reachable once a real database and a real request existed.
+
+Decisions D20–D25 record what the second stage settled. The forward-looking record, including the milestone breakdown and the design inventory taken from Figma, is `docs/plans/chat-features.md`.
 
 ### D2 — React + Vite, not Next.js
 
@@ -63,7 +65,7 @@ Shared `tsconfig` / ESLint / Prettier configuration lives at the repository root
 
 ### D8 — Mongoose over the native driver
 
-Mongoose 9. The features immediately after this stage — unread counts, quote replies, mentions — are all about relations and subdocuments. With the raw driver, validation, population and relations would all be hand-written, which is a net loss on a deadline.
+Mongoose 9. The features layered on top of the scaffold — unread counts, quote replies, mentions — are all about relations and subdocuments. With the raw driver, validation, population and relations would all be hand-written, which is a net loss on a deadline.
 
 MongoDB Atlas was rejected as the default: a network dependency between the app and the database is a bad first-run experience for anyone evaluating the repository. Local MongoDB is the documented path, with a one-line `docker run` alternative in the README.
 
@@ -81,7 +83,7 @@ Real registration was rejected as scope the project does not need yet; no identi
 
 ### D11 — Apollo Client 4 with the codegen `client` preset
 
-Matching the server's ecosystem keeps the vocabulary consistent, and Apollo's normalised cache is what will make incremental updates work well once message broadcasts arrive — `cache.modify` on a `message:created` event is far less code than hand-managed cache invalidation.
+Matching the server's ecosystem keeps the vocabulary consistent, and Apollo's normalised cache is what makes incremental updates cheap once message broadcasts arrive — `cache.updateQuery` / `cache.modify` on a `message:created` event is far less code than hand-managed cache invalidation, and it is why D24 can promise "no refetch".
 
 **Caveat:** Apollo Client 4 is a substantial rewrite (it introduces `rxjs` as a peer, and the React entry points moved to `@apollo/client/react`). Do not copy version 3 patterns.
 
@@ -156,6 +158,60 @@ Measured rather than assumed — of the three plausible spellings, only the two 
 | path omitted + timestamps                     | works, but the document type loses the keys |
 
 Worth recording _how_ this was found: the scaffold was written, linted, type-checked and committed before a MongoDB was ever reachable, so every test either avoided the database or skipped itself. The model layer had never been executed. Connecting a real database was the first honest test of it.
+
+### D20 — The message body is a markdown subset, parsed to React nodes, never `innerHTML`
+
+`**bold**`, `*italic*`, `~~strikethrough~~`, ordered and bullet lists, links, and mentions. The parser produces an AST; the renderer maps that AST to React nodes.
+
+Two reasons this is not "markdown support":
+
+1. **The composer toolbar needs real formatting.** The design draws seven buttons. Buttons that insert literal asterisks and render nothing are theatre.
+2. **It removes the XSS class instead of managing it.** There is no `dangerouslySetInnerHTML` in the path and no sanitiser either — a parser that can only ever emit a closed set of node types has no injection surface. The concrete case is links: a destination that is not `http(s)://` or `mention:` is not emitted as a link at all, so there is no `javascript:` URL to escape downstream. A sanitiser would be a second, weaker statement of the same rule.
+
+The parser is also **bounded on purpose**. An early version could fail to advance inside an unmatched inline marker and spin forever, pinning a core (found as 30% CPU and a hung request, not by reading the code). The fix clamps every `indexOf` substring to the source length and requires a non-empty span before a marker counts as closed — `**` does not close on the second character of itself. There are termination tests with a hard timeout for this bug class specifically, because a hang is not something a normal assertion catches.
+
+### D21 — Quotes are frozen snapshots, not foreign keys
+
+`replyTo` stores `{ messageId, senderId, senderDisplayName, bodyExcerpt, createdAt }` on the replying message.
+
+A join would have been the reflexive choice. It was rejected for three reasons: the read path does zero joins, the quoted card survives the quoted message being deleted, and the design's `Devon Lane: Check out Vanilla Forums (11/17 - 11/…` line _is_ the snapshot — it is a truncated copy, not a reference. The snapshot never nests a `replyTo`, so quote depth is fixed at 1 by construction rather than by a depth check.
+
+The cost is that a renamed user's older quotes keep the old display name. Accepted: a quote is a record of what was said, not a live join.
+
+### D22 — Unread is derived, never stored
+
+The count is `count(messages after the viewer's read cursor, from someone else, not deleted)`, computed by the server and pushed per recipient.
+
+A stored counter was rejected outright: it has to be incremented on send, decremented on read, and adjusted on delete, and any missed path drifts silently and permanently. A derived count cannot drift — it is a query over the same rows the UI reads.
+
+The honest consequence is that **soft delete does not make the count monotonic.** Deleting an unread message lowers the count exactly as a hard delete would, because the count is a projection of live rows. That is written down here so it is never mistaken for a bug.
+
+### D23 — `NOT_FOUND` for a non-member, `FORBIDDEN` for the wrong sender
+
+`requireMembership` throws `NOT_FOUND` when the viewer is not a member of the conversation, rather than `FORBIDDEN`.
+
+`FORBIDDEN` would confirm the conversation exists, which makes the API an enumeration oracle for every id in the database. `NOT_FOUND` says the same thing to an attacker and the true thing to nobody. `FORBIDDEN` is reserved for the case where the viewer _is_ a member and the request is still refused — deleting someone else's message — where the refusal leaks nothing they cannot already see.
+
+A field resolver returns `null` rather than throwing when a row is missing, for the same reason: absence is not an error.
+
+### D24 — Socket events write the cache; there is no refetch
+
+On `message:created`, `message:deleted` or `conversation:activity` the client writes the Apollo normalised cache (`cache.updateQuery` / `cache.modify`) and does not refetch.
+
+This is the decision that separates a realtime feature from a notification bell. If the handler refetched, the socket would be a latency-adding way to trigger a polling loop, and the cache would be a formality.
+
+Two rules that follow, and are enforced by tests rather than comments:
+
+- **Merge by message id.** Fan-out is room-based, so the sender receives their own `message:created`. A blind append renders every sent message twice.
+- **Dedupe, do not reorder.** The conversation list is sorted by the component on `lastActivityAt` (P11). Sorting inside a hand-written `Query.merge` would fight the pagination invariant for no gain.
+
+All of these writes live in `apps/web/src/lib/write.ts`, one file, so they are unit-testable without a socket and reviewable in one pass.
+
+### D25 — Identity lives in `sessionStorage`
+
+The fake login moved from `localStorage` to `sessionStorage`.
+
+`localStorage` is shared per origin, so two tabs are always the same user. On a single machine — which is how this will be reviewed — that removes the receiving half of the demo entirely: you can never be the person the message arrives for. Per-tab identity makes the realtime path demonstrable with one browser and no second device.
 
 ---
 

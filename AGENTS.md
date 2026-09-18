@@ -29,7 +29,6 @@ Run everything from the repository root.
 | `apps/web`        | Everything client-side: components, hooks, Apollo client                                  | Import from `apps/api`                              |
 
 The two apps talk only through `packages/shared` and the network.
-
 `packages/shared` has two entry points, and picking the right one matters:
 
 | Import                       | Contains                                            | Safe in the browser?         |
@@ -61,20 +60,43 @@ The API and `packages/shared` are native ESM with `moduleResolution: NodeNext`, 
 - TypeScript is pinned to `~6.0.3`. Do not bump it to 7.x — `typescript-eslint@8` does not support it yet.
 - Prefer `import type` for type-only imports.
 
+### Frontend
+
+- **Do not write a ref during render, and do not set state from an effect.** ESLint's React Compiler rules reject both (`react-hooks/refs`, `react-hooks/set-state-in-effect`). The replacement is almost always to _derive_ the value during render, or to add the thing to an effect's dependency array. Two passes through this codebase turned up genuine anti-patterns rather than false positives; treat the rule as a finding, not an obstacle.
+- **Generated query types are fragment-masked.** A result is `{ ' $fragmentRefs'?: { ... } }` until unwrapped with `getFragmentData`. The normalised cache holds _unmasked_ data, which is why `apps/web/src/lib/write.ts` is typed against the fragment types rather than the query types.
+- **`__typename` must be selected explicitly in document text.** The codegen `client` preset defaults to `skipTypename`, so `write.ts` — which hand-writes cache objects — would emit incomplete ones otherwise. Setting the codegen option has no effect.
+- Put every operation in `apps/web/src/graphql.ts`. `cache.updateQuery` compares documents by reference, so a component and a cache write must hand over the _same_ object, not two structurally identical ones.
+- `react-refresh/only-export-components` means a component file exports components only. Helpers (`initialsOf`, `formatMessageTime`) live in their own modules.
+- A component file must not differ from a sibling module only in case (`Markdown.tsx` vs `markdown.ts`). TypeScript rejects it with TS1149, and it genuinely breaks on case-insensitive filesystems.
+
 ### Errors
 
 GraphQL errors use `SCREAMING_SNAKE` codes in `extensions.code`, created with `graphQLError()` from `apps/api/src/graphql/errors.ts`. Never surface a raw driver or internal message to the client.
+
+A non-member asking for a conversation gets `NOT_FOUND`, not `FORBIDDEN` — otherwise the API confirms which ids exist. `FORBIDDEN` is for a member whose request is still refused. See D23.
 
 ### Models
 
 - Declare `createdAt` / `updatedAt` in the schema so `InferSchemaType` keeps the keys, but **never with `required: true`**: Mongoose runs validators before the timestamps plugin writes the values, so every insert fails with "Path `createdAt` is required". See D19 in `docs/DECISIONS.md`.
 - When a timestamp needs a value other than "now" — the seed aligning a conversation with its last message — go through `Model.collection` (`updateOne`), because Mongoose stamps its own `updatedAt` on any update it performs.
+- `Message` has a `pre(/^find/)` hook that excludes soft-deleted rows. **Do not add a second filter at the call site** — that is how the two copies drift and one of them is forgotten. When a read genuinely needs deleted rows, opt out explicitly with `INCLUDE_DELETED`.
+
+### Messaging domain
+
+- **The markdown parser must terminate on any input.** It is the one place where a malformed byte can hang a request. Every substring search is clamped to the source length, and a marker only closes a span if that span is non-empty. If you touch `apps/api/src/lib/markdown.ts` or `apps/web/src/features/messages/markdown.ts`, run the termination tests — they carry a hard timeout precisely because a hang passes every ordinary assertion.
+- **Never render a message body with `innerHTML` or `dangerouslySetInnerHTML`.** The AST exists so the renderer only ever emits known node types. Adding a sanitiser is not the fix; emitting a safe node is.
+- **Mention formatting is `[@Name](mention:<userId>)`,** built with `formatMention()` from `@pulsechat/shared/markdown`. Never hand-write the syntax in a component.
+- **Do not store a `mentions` array.** `Message.mentions` is a field resolver over `body`. A parallel array is a second source of truth that can disagree with the text.
+- **Unread counts are computed server-side,** per recipient, at emit time. Never `+1` on the client.
 
 ### Realtime
 
 - Every write goes through GraphQL. socket.io is server-to-client push only.
 - Never hard-code an event name. Import it from `SOCKET_EVENTS` in `@pulsechat/shared/realtime`, and add new events to the interfaces in `packages/shared/src/realtime.ts` — the `satisfies` clause makes the build fail if a constant and an interface drift apart.
 - Authorise before joining any room.
+- **The sender receives their own `message:created`** — fan-out is room-based. Any handler that appends to a list must dedupe by message id first.
+- **A socket event never triggers a refetch.** It writes the Apollo cache (`cache.updateQuery` / `cache.modify`). All such writes belong in `apps/web/src/lib/write.ts`, so they stay testable without a socket. See D24.
+- Do not sort a list inside `Query.merge`. The component sorts on `lastActivityAt`.
 
 ### Tests
 

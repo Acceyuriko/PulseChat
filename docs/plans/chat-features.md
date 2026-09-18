@@ -1,13 +1,18 @@
 # Messaging features — implementation plan
 
-**Status: planned, not built.** This is the forward-looking half of the record.
-`docs/DECISIONS.md` says what the code _is_; this file says what we intend to build and
-which choices were settled before any of it was written.
+**Status: built.** Kept as written — a plan rewritten after the fact stops being a plan —
+with an as-built note at the head of each section where the code ended up somewhere else.
+`docs/DECISIONS.md` says what the code _is_; this file says what was intended, and where
+reality disagreed.
 
 The UI baseline is the Figma file **Full-Stack Developer Assignment**
 (`CBKcxWGEJGFe05ZsbgZZ2z`). Its inventory is reproduced in
 [Appendix A](#appendix-a--design-inventory) so this plan does not depend on Figma access
 going forward.
+
+> **Figma access is gone.** The account's starter-plan API quota is exhausted (HTTP 429), so
+> the design cannot be re-fetched. Appendix A is the record; treat it as the source, not a
+> cache of one.
 
 ---
 
@@ -22,7 +27,8 @@ One vertical slice, verified end to end against a real MongoDB:
   on membership
 - 23 passing tests — 12 backend unit, 7 backend integration, 4 frontend component
 
-Nothing in this plan exists yet.
+Nothing in this plan existed when it was written. All of it does now; the test count at the
+end of M8 is **212** (93 API — 12 unit, 7 integration, 3 socket contract — plus 119 web).
 
 ## 2. Where the design exceeds the requirement
 
@@ -193,6 +199,13 @@ Two rules that are easy to get wrong and are therefore stated here:
 join a room and receive its traffic. That was verified by hand during scaffolding and
 becomes an automated case under P13.
 
+> **As built — one correction.** The `message:deleted` payload grew a `conversation` field
+> (`RealtimeConversationActivity`), so the peer can correct its list row — preview, activity
+> time and badge — without a refetch, exactly as `message:created` does. Shipping only
+> `{ conversationId, messageId }` left the row showing the text of a message the stream had
+> already replaced with a placeholder. The `conversation:activity` emit to the _other_
+> members on delete is what the same payload also covers.
+
 ## 7. Modules
 
 The answer to "what needs building", grouped by where it lands.
@@ -286,6 +299,16 @@ The answer to "what needs building", grouped by where it lands.
 
 M1 → M4 is backend-only and each step is verifiable without a browser. M5 → M7 assumes the
 socket contract is already frozen, so the frontend never has to guess at a payload shape.
+
+> **As built — all eight are done.** M1–M4 landed in `9d514b2`; M5–M7 in `78d1317`; M8 is the
+> docs commit that carries this note. `pnpm verify` is green at 212 tests.
+>
+> The whole realtime path was also checked end to end against a running server with two real
+> socket clients on one machine — the sender's echo, the receiver's `message:created`, the
+> server-computed `unreadCount`, the DM preview _not_ being sender-prefixed, the frozen quote
+> excerpt, the delete fan-out, and `FORBIDDEN` when one user deletes another's message.
+> The automation in M4 covers the same contract; the manual pass is what proves the HTTP and
+> websocket halves agree on a single payload.
 
 ## 9. Deliberate omissions
 

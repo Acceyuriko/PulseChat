@@ -20,6 +20,16 @@ const config: CodegenConfig = {
           DateTime: 'string',
         },
         useTypeImports: true,
+        /**
+         * `enumsAsTypes` keeps `kind` a string union (`'CHANNEL' | 'DM'`) rather than a generated
+         * enum object. It is what makes `conversation.kind === 'DM'` narrow correctly in a
+         * component, and it avoids emitting a runtime enum that both apps would then import.
+         *
+         * Note that `__typename` is *not* configured here even though Apollo's cache always stores
+         * it: the `client` preset defaults to `skipTypename`, so it has to be selected explicitly in
+         * the documents under `src/graphql.ts`. See the comment there.
+         */
+        enumsAsTypes: true,
       },
       presetConfig: {
         fragmentMasking: {

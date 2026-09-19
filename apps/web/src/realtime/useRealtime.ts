@@ -10,6 +10,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { type Socket, io } from 'socket.io-client'
 
 import {
+  MESSAGES_QUERY_LIMIT,
   applyConversationActivity,
   applyMessageCreated,
   applyMessageDeleted,
@@ -155,7 +156,15 @@ export function useRealtime({ userId, activeConversationId }: UseRealtimeOptions
       // The list row and the message list are patched independently. The row updates even when the
       // conversation is not open, which is what makes a message "arrive" for someone looking
       // somewhere else.
-      applyMessageCreated(client.cache, { conversationId: payload.conversationId }, payload.message)
+      //
+      // `limit` is not optional here: Apollo keys a cache entry by document *and* variables, and
+      // `MessageStream` reads `{ conversationId, limit: MESSAGES_QUERY_LIMIT }`. Omitting it writes
+      // an entry nothing reads — the message silently never shows up in the open conversation.
+      applyMessageCreated(
+        client.cache,
+        { conversationId: payload.conversationId, limit: MESSAGES_QUERY_LIMIT },
+        payload.message,
+      )
       reorderConversations(client.cache)
 
       note(SOCKET_EVENTS.messageCreated, `in ${shortId(payload.conversationId)}`)

@@ -1,7 +1,6 @@
 import type { RealtimeConversationActivity, RealtimeMessage } from '@pulsechat/shared/realtime'
 
 import { countUnread } from '../domain/unread.js'
-import { parseToPlainText } from '../domain/markdown.js'
 import type { ConversationDTO, MessageDTO } from '../graphql/mappers.js'
 
 /**
@@ -9,34 +8,8 @@ import type { ConversationDTO, MessageDTO } from '../graphql/mappers.js'
  * (docs/plans/chat-features.md §6).
  *
  * Kept separate from the socket server so the payload shape is unit-testable without opening a
- * connection, and so there is exactly one place that decides what a preview looks like.
+ * connection.
  */
-
-/** How much of a body a list preview shows before it is cut. */
-export const PREVIEW_MAX_LENGTH = 80
-
-/**
- * The conversation-list preview line.
- *
- * Two rules from the design, both encoded here rather than in the renderer:
- *   - a channel preview is prefixed with `Sender: `, a DM preview is not (the row already shows
- *     the other person, so repeating their name would be noise);
- *   - the body is reduced to plain text, so a preview never leaks `**` or a mention link.
- */
-export function buildPreview(
-  kind: ConversationDTO['kind'],
-  senderDisplayName: string,
-  body: string,
-): string {
-  const text = parseToPlainText(body).replace(/\s+/g, ' ').trim()
-  const characters = Array.from(text)
-  const excerpt =
-    characters.length <= PREVIEW_MAX_LENGTH
-      ? text
-      : `${characters.slice(0, PREVIEW_MAX_LENGTH).join('').trimEnd()}…`
-
-  return kind === 'DM' ? excerpt : `${senderDisplayName}: ${excerpt}`
-}
 
 /**
  * A message as it travels over the socket.
@@ -76,6 +49,11 @@ export function toRealtimeMessage(message: MessageDTO): RealtimeMessage {
  *
  * `unreadCount` is computed here, per recipient, and never incremented by the client: a client-side
  * `+1` drifts across tabs, reconnects and deletes.
+ *
+ * The newest message travels as itself rather than as a pre-rendered `preview` string. The client
+ * derives the preview line from `lastMessage` — the same rule the row component uses on first load —
+ * so there is one implementation of "channel rows are `Sender: `-prefixed, DM rows are not" instead
+ * of two that can disagree.
  */
 export function buildActivity(
   conversation: ConversationDTO,
@@ -93,13 +71,6 @@ export function buildActivity(
       messages,
     }),
     lastActivityAt: (lastMessage?.createdAt ?? conversation.createdAt).toISOString(),
-    preview:
-      lastMessage === null
-        ? ''
-        : // A deleted message is still the newest row; the preview says so rather than showing a
-          // body the user is no longer allowed to see.
-          lastMessage.deletedAt === null
-          ? buildPreview(conversation.kind, lastMessage.sender.displayName, lastMessage.body)
-          : 'This message was deleted',
+    lastMessage: lastMessage === null ? null : toRealtimeMessage(lastMessage),
   }
 }

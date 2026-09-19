@@ -22,7 +22,7 @@ import { createApolloServer } from '../graphql/apollo.js'
 import { ConversationModel } from '../models/conversation.js'
 import { MessageModel } from '../models/message.js'
 import { UserModel } from '../models/user.js'
-import { attachRealtime } from '../realtime/server.js'
+import { attachRealtime, type RealtimeEmitter } from '../realtime/server.js'
 
 /**
  * The realtime contract test (docs/plans/chat-features.md, P13 and module 36).
@@ -124,8 +124,26 @@ describe.skipIf(!databaseReachable)('socket contract', () => {
     const apolloServer = createApolloServer(httpServer)
     await apolloServer.start()
 
-    const { emitter } = attachRealtime(httpServer, { corsOrigin: env.corsOrigin })
-    httpServer.on('request', createApp(apolloServer, { emitter }))
+    /**
+     * The Express app goes on first, then socket.io — the same order as `src/index.ts`, and the
+     * order the polling-handshake test below depends on.
+     */
+    const realtime: { emitter: RealtimeEmitter | null } = { emitter: null }
+
+    httpServer.on(
+      'request',
+      createApp(apolloServer, {
+        emitter: () => {
+          if (realtime.emitter === null) {
+            throw new Error('The realtime layer emitted before it was attached')
+          }
+
+          return realtime.emitter
+        },
+      }),
+    )
+
+    realtime.emitter = attachRealtime(httpServer, { corsOrigin: env.corsOrigin }).emitter
 
     await new Promise<void>((resolve) => {
       httpServer.listen(0, '127.0.0.1', resolve)
@@ -168,6 +186,31 @@ describe.skipIf(!databaseReachable)('socket contract', () => {
     })
 
     await disconnectDatabase()
+  })
+
+  /**
+   * The mount order above, exercised over the transport that exposes it.
+   *
+   * The browser's socket.io-client starts on **polling**, an ordinary `GET /socket.io/` — which the
+   * `transports: ['websocket']` clients used elsewhere in this file never issue. With the app mounted
+   * after `attachRealtime`, both listeners answer it and the request fails before the protocol even
+   * starts, so this asserts at the HTTP layer rather than at the socket connection.
+   */
+  it('serves the polling handshake the browser opens with', async () => {
+    const response = await fetch(`${baseUrl}/socket.io/?EIO=4&transport=polling`)
+
+    expect(response.status).toBe(200)
+
+    // engine.io answers a polling handshake with an open-packet carrying a session id.
+    expect(await response.text()).toMatch(/^0\{/)
+
+    // The GraphQL transport has to keep working on the same server afterwards — the two share one
+    // `request` listener, so a dispatcher that swallowed the app would show up right here.
+    const response2 = await fetch(`${baseUrl}/health`)
+    const health = (await response2.json()) as { status: string }
+
+    expect(response2.status).toBe(200)
+    expect(health.status).toBe('ok')
   })
 
   it('rejects a handshake with no identity', async () => {
@@ -302,8 +345,14 @@ describe.skipIf(!databaseReachable)('socket contract', () => {
 
     expect(activity.conversationId).toBe(ROOM_ID.toString())
     expect(activity.unreadCount).toBeGreaterThan(0)
-    // A channel preview carries the `Sender: ` prefix, per the design's list rules.
-    expect(activity.preview).toMatch(/^Bob: /)
+    /**
+     * The newest message travels as the message itself, not as a pre-rendered preview string. The
+     * row derives the `Sender: ` prefix from this, so what has to hold here is that the payload
+     * carries enough to do it: the sender's display name and the body.
+     */
+    expect(activity.lastMessage?.sender.displayName).toBe('Bob')
+    expect(activity.lastMessage?.body).toBe('a message Alice has not read')
+    expect(activity.lastActivityAt).toBe(activity.lastMessage?.createdAt)
 
     socket.disconnect()
   })
@@ -385,8 +434,15 @@ describe.skipIf(!databaseReachable)('socket contract', () => {
 
     expect(payload.messageId).toBe(messageId)
     expect(payload.conversationId).toBe(ROOM_ID.toString())
-    // The delete moved `lastMessage` backwards, so the corrected activity travels with the event.
-    expect(payload.conversation.lastActivityAt).toBeTruthy()
+    /**
+     * The delete moved `lastMessage` backwards, so the corrected activity travels with the event.
+     *
+     * `lastMessage` is asserted by *identity* rather than by a preview string: the row has to end up
+     * pointing at a different message than the one just deleted, and that is exactly what a stale
+     * preview would hide.
+     */
+    expect(payload.conversation.lastMessage?.id).not.toBe(messageId)
+    expect(payload.conversation.lastActivityAt).toBe(payload.conversation.lastMessage?.createdAt)
 
     socket.disconnect()
   })

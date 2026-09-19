@@ -14,7 +14,7 @@ The first stage delivered a complete scaffold plus **one vertical slice**: a use
 
 Sending messages was deliberately _not_ sketched in ahead of time: for the first stage there were no placeholder `replyTo` / `mentions` fields on the models. Pre-placing schema for features that do not exist yet is how scaffolds turn into guesses. The staging paid for itself twice — the timestamp bug in D19 and the parser hang in D20 were both only reachable once a real database and a real request existed.
 
-Decisions D20–D25 record what the second stage settled. The forward-looking record, including the milestone breakdown and the design inventory taken from Figma, is `docs/plans/chat-features.md`.
+Decisions D20–D26 record what the second stage settled. The forward-looking record, including the milestone breakdown and the design inventory taken from Figma, is `docs/plans/chat-features.md`.
 
 ### D2 — React + Vite, not Next.js
 
@@ -194,9 +194,15 @@ The honest consequence is that **soft delete does not make the count monotonic.*
 
 A field resolver returns `null` rather than throwing when a row is missing, for the same reason: absence is not an error.
 
+This is about a **row**, not a **member-gated query**. `conversation(id:)` is membership-gated, so it throws `NOT_FOUND` in both the missing and the non-member case — it cannot return `null` without answering the question the two cases were merged to hide. `Conversation.lastMessage` is the field resolver the paragraph above describes: an empty conversation is a legitimate state and yields `null`.
+
 ### D24 — Socket events write the cache; there is no refetch
 
 On `message:created`, `message:deleted` or `conversation:activity` the client writes the Apollo normalised cache (`cache.updateQuery` / `cache.modify`) and does not refetch.
+
+**An Apollo cache entry is keyed by document _and_ variables.** The `limit` a component reads with is therefore part of a write's contract, not a detail of the read: `{ conversationId }` and `{ conversationId, limit: 50 }` are two different entries, and writing the first while a component reads the second is a no-op with no error attached to it. `MESSAGES_QUERY_LIMIT` in `lib/write.ts` is the single definition both sides use, so the two variable sets cannot drift.
+
+`conversation:activity` carries `lastMessage` as a **message**, not as a pre-rendered `preview` string. The row's preview line is a rendering of `lastMessage` — channel rows are `Sender: `-prefixed, DM rows are not, a deleted newest message says so — and the client already owns that rule. A flattened string would be a second source of truth that a later delete could not correct.
 
 This is the decision that separates a realtime feature from a notification bell. If the handler refetched, the socket would be a latency-adding way to trigger a polling loop, and the cache would be a formality.
 
@@ -207,7 +213,17 @@ Two rules that follow, and are enforced by tests rather than comments:
 
 All of these writes live in `apps/web/src/lib/write.ts`, one file, so they are unit-testable without a socket and reviewable in one pass.
 
-### D25 — Identity lives in `sessionStorage`
+### D25 — The Express app is mounted before socket.io is attached
+
+`httpServer.on('request', createApp(...))` runs **before** `attachRealtime(httpServer)`. The order is load-bearing.
+
+socket.io's `attach` snapshots `server.listeners('request')` at call time, removes them, and installs a dispatcher that replays that snapshot for every path except `/socket.io/**`. A listener registered afterwards is not in the snapshot, so it remains a second, independent listener and handles `/socket.io/**` too.
+
+The reverse cost is that the emitter does not exist yet when the app is built, which is why `createApp` takes a **thunk** (`() => RealtimeEmitter`) rather than the emitter itself. That thunk is only ever called from inside a resolver, long after `main()` has returned.
+
+The socket tests connect with `transports: ['websocket']`, which is not a browser's behaviour: a browser opens with a polling handshake, an ordinary `GET /socket.io/?EIO=4&transport=polling`. Any test of this ordering has to exercise that request rather than a websocket connection.
+
+### D26 — Identity lives in `sessionStorage`
 
 The fake login moved from `localStorage` to `sessionStorage`.
 

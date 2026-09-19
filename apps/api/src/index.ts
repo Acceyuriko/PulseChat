@@ -4,7 +4,7 @@ import { createApp } from './app.js'
 import { env } from './config/env.js'
 import { connectDatabase, disconnectDatabase } from './db/connection.js'
 import { createApolloServer } from './graphql/apollo.js'
-import { attachRealtime } from './realtime/server.js'
+import { attachRealtime, type RealtimeEmitter } from './realtime/server.js'
 
 async function main(): Promise<void> {
   // Fail fast: a chat backend that boots without persistence breaks in a far more confusing way.
@@ -17,12 +17,32 @@ async function main(): Promise<void> {
   await apolloServer.start()
 
   /**
-   * The realtime handle is created first so the GraphQL layer can be handed it: mutations emit
-   * through `context.emitter` after a successful write, and socket.io itself never writes.
+   * **Mount the Express app before attaching socket.io. The order is load-bearing.**
+   *
+   * socket.io's `attach` snapshots `server.listeners('request')` at call time, removes them, and
+   * installs its own dispatcher that replays the snapshot for every path except `/socket.io/**`.
+   * A listener added afterwards is not in that snapshot, so it stays a second, independent listener
+   * and handles `/socket.io/**` too — two responders on one request.
+   *
+   * The emitter is resolved through a thunk because it does not exist until `attachRealtime` has
+   * run. That thunk is only ever called from a resolver, long after this function returns.
    */
-  const { emitter } = attachRealtime(httpServer, { corsOrigin: env.corsOrigin })
+  const realtime: { emitter: RealtimeEmitter | null } = { emitter: null }
 
-  httpServer.on('request', createApp(apolloServer, { emitter }))
+  httpServer.on(
+    'request',
+    createApp(apolloServer, {
+      emitter: () => {
+        if (realtime.emitter === null) {
+          throw new Error('The realtime layer emitted before it was attached')
+        }
+
+        return realtime.emitter
+      },
+    }),
+  )
+
+  realtime.emitter = attachRealtime(httpServer, { corsOrigin: env.corsOrigin }).emitter
 
   await new Promise<void>((resolve) => {
     httpServer.listen({ port: env.port }, resolve)

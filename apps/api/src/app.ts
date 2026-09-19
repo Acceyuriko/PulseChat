@@ -9,10 +9,13 @@ import type { RealtimeEmitter } from './realtime/server.js'
 
 export interface CreateAppOptions {
   /**
-   * The realtime handle mutations push through after a successful write. Omitted in tests that do
-   * not exercise the socket path, in which case `NOOP_EMITTER` stands in.
+   * Resolves the realtime handle mutations push through after a successful write. Omitted in tests
+   * that do not exercise the socket path, in which case `NOOP_EMITTER` stands in.
+   *
+   * A thunk rather than the handle itself, because the app is mounted **before** socket.io is
+   * attached — see the ordering note in `src/index.ts`.
    */
-  emitter?: RealtimeEmitter
+  emitter?: () => RealtimeEmitter
 }
 
 /**

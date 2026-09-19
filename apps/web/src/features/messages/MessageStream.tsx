@@ -4,13 +4,17 @@ import { useEffect, useMemo, useRef } from 'react'
 import { getFragmentData } from '../../gql'
 import type { MessageFieldsFragment } from '../../gql/graphql'
 import { MessageFields, MessagesQuery } from '../../graphql'
+import { MESSAGES_QUERY_LIMIT } from '../../lib/write'
 import { MessageRow } from './MessageRow'
 import type { MentionLookup } from './mentions'
 
-/** How many messages the pane loads. Matches the server's default; there is no pagination (P14). */
-const MESSAGE_LIMIT = 50
-
-/** A message is grouped with the previous one when the same person sent both this close together. */
+/**
+ * A message is grouped with the previous one when the same person sent both this close together.
+ *
+ * The query's `limit` comes from `MESSAGES_QUERY_LIMIT` rather than a local constant: the socket
+ * handler has to write to the *same* cache entry, Apollo keys entries by variables, and two
+ * independent copies of that number would silently stop matching.
+ */
 const GROUPING_WINDOW_MS = 5 * 60_000
 
 export interface MessageStreamProps {
@@ -36,7 +40,7 @@ export function MessageStream({
   onDelete,
 }: MessageStreamProps) {
   const { data, loading, error } = useQuery(MessagesQuery, {
-    variables: { conversationId, limit: MESSAGE_LIMIT },
+    variables: { conversationId, limit: MESSAGES_QUERY_LIMIT },
   })
 
   const messages = useMemo(() => {

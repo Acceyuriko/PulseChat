@@ -288,7 +288,7 @@ export function parseMarkdown(source: string): MarkdownBlockNode[] {
   return blocks
 }
 
-/** The plain text of a parsed body, for previews, excerpts and accessibility labels. */
+/** The plain text of a parsed body — the reduction a quote excerpt is built from. */
 export function toPlainText(nodes: MarkdownInlineNode[]): string {
   return nodes
     .map((node) => {

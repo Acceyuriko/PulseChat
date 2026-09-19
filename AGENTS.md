@@ -96,6 +96,8 @@ A non-member asking for a conversation gets `NOT_FOUND`, not `FORBIDDEN` — oth
 - Authorise before joining any room.
 - **The sender receives their own `message:created`** — fan-out is room-based. Any handler that appends to a list must dedupe by message id first.
 - **A socket event never triggers a refetch.** It writes the Apollo cache (`cache.updateQuery` / `cache.modify`). All such writes belong in `apps/web/src/lib/write.ts`, so they stay testable without a socket. See D24.
+- **A cache write must use the same variables the reading component does.** Apollo keys an entry by document _and_ variables, so `{ conversationId }` and `{ conversationId, limit: MESSAGES_QUERY_LIMIT }` are two different entries — writing one while a component reads the other is a silent no-op. Use the shared constants in `lib/write.ts`.
+- **Mount the Express app before attaching socket.io.** `attachRealtime` snapshots the server's `request` listeners, so an app added afterwards also handles `/socket.io/**` and the polling handshake throws `ERR_HTTP_HEADERS_SENT`, killing the process. A socket client pinned to `transports: ['websocket']` will not catch this; a browser will. See D25.
 - Do not sort a list inside `Query.merge`. The component sorts on `lastActivityAt`.
 
 ### Tests

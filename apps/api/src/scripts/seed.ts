@@ -1,5 +1,7 @@
 import { Types } from 'mongoose'
 
+import { formatMention } from '@pulsechat/shared/markdown'
+
 import { connectDatabase, disconnectDatabase } from '../db/connection.js'
 import { letterAvatarDataUri } from '../domain/avatar.js'
 import { buildQuoteSnapshot } from '../domain/quote.js'
@@ -30,6 +32,13 @@ interface SeedMessage {
   /** Display name of the sender; resolved to an id once the users exist. */
   from: string
   body: string
+  /**
+   * Display names to mention at the head of this message.
+   *
+   * Listed as names rather than written into `body` so the seed never hand-writes the wire format:
+   * `formatMention` produces it once the ids exist. A message reads `Prefix @Name1 @Name2 rest…`.
+   */
+  bodyMentions?: string[]
   /** Display name of the author of the quoted message, when this message quotes one. */
   replyToFrom?: string
   /** Index of the quoted message within this conversation's own message list. */
@@ -79,6 +88,52 @@ const SEED_CONVERSATIONS: SeedConversation[] = [
         minutesAgo: 180,
       },
       { from: 'Allen Smith', body: '[File] Design Guideline.pdf', minutesAgo: 150 },
+    ],
+  },
+  /**
+   * The design's second badge is a `6`, and it is the only row whose preview is a mention
+   * (`Grace: @Lynne have time to huddle?`). Both come from the same place: the member with the
+   * badge has never read, so every message from anyone else counts.
+   *
+   * `Lynne Foster` is the one who stays behind, and the six messages below are all from other
+   * people — a seventh from Lynne herself would not count, which is the derivation doing its job.
+   */
+  {
+    kind: 'CHANNEL',
+    title: 'Product team',
+    memberNames: ['Grace Hopper', 'Lynne Foster', 'Devon Lane', 'Tim Johnson'],
+    unreadFor: ['Lynne Foster'],
+    messages: [
+      { from: 'Devon Lane', body: 'Standup is moving to 9:30 from Monday.', minutesAgo: 500 },
+      {
+        from: 'Lynne Foster',
+        body: 'Works for me.',
+        replyToFrom: 'Devon Lane',
+        replyToIndex: 0,
+        minutesAgo: 480,
+      },
+      {
+        from: 'Tim Johnson',
+        body: 'Good — the old slot clashed with the design review.',
+        minutesAgo: 420,
+      },
+      { from: 'Devon Lane', body: 'I will update the calendar invites today.', minutesAgo: 360 },
+      { from: 'Grace Hopper', body: 'Same here.', minutesAgo: 300 },
+      {
+        from: 'Tim Johnson',
+        body: 'Should we keep the Friday retro where it is?',
+        minutesAgo: 240,
+      },
+      /**
+       * The design's mention row. The syntax comes from `formatMention` at seed time, so this
+       * string is never hand-written — see the `bodyMentions` handling in `seed()`.
+       */
+      {
+        from: 'Grace Hopper',
+        bodyMentions: ['Lynne Foster'],
+        body: 'have time to huddle?',
+        minutesAgo: 60,
+      },
     ],
   },
   {
@@ -135,22 +190,6 @@ const SEED_CONVERSATIONS: SeedConversation[] = [
       },
       { from: 'Eric Chen', body: 'The dark palette reads much better now.', minutesAgo: 660 },
       { from: 'Eric Chen', body: 'Yeah I know 🫢', minutesAgo: 120 },
-    ],
-  },
-  {
-    kind: 'CHANNEL',
-    title: 'Product team',
-    memberNames: ['Grace Hopper', 'Lynne Foster', 'Devon Lane', 'Tim Johnson'],
-    messages: [
-      { from: 'Devon Lane', body: 'Standup is moving to 9:30 from Monday.', minutesAgo: 500 },
-      {
-        from: 'Lynne Foster',
-        body: 'Works for me.',
-        replyToFrom: 'Devon Lane',
-        replyToIndex: 0,
-        minutesAgo: 480,
-      },
-      { from: 'Grace Hopper', body: 'Same here.', minutesAgo: 60 },
     ],
   },
   {
@@ -265,6 +304,19 @@ async function seed(): Promise<void> {
     for (const definitionMessage of definition.messages) {
       const sender = userByName(byName, definitionMessage.from)
 
+      /**
+       * The mention wire format is produced here, by `formatMention`, rather than being typed into
+       * `body` — the same function the composer calls. A hand-written `[@Name](mention:id)` in the
+       * seed would be a second spelling of the format, and the parser would be the only thing
+       * keeping the two honest.
+       */
+      const body =
+        definitionMessage.bodyMentions === undefined
+          ? definitionMessage.body
+          : `${definitionMessage.bodyMentions
+              .map((name) => formatMention(name, String(userByName(byName, name)._id)))
+              .join(' ')} ${definitionMessage.body}`
+
       let replyTo = null
 
       if (
@@ -288,7 +340,7 @@ async function seed(): Promise<void> {
       const message = await MessageModel.create({
         conversationId: conversation._id,
         senderId: sender._id,
-        body: definitionMessage.body,
+        body,
         replyTo,
         createdAt,
       })
@@ -305,7 +357,7 @@ async function seed(): Promise<void> {
         id: String(message._id),
         senderId: String(sender._id),
         senderDisplayName: sender.displayName,
-        body: definitionMessage.body,
+        body,
         createdAt,
       })
     }

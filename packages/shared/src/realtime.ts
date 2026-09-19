@@ -35,12 +35,19 @@ export interface RealtimeQuoteSnapshot {
  *
  * `unreadCount` is computed **by the server, per recipient** — a client-side `+1` drifts across
  * tabs, reconnects and deletes, and the list has to stay correct while you are looking elsewhere.
+ *
+ * `lastMessage` travels as the message itself rather than as a pre-flattened `preview` string. The
+ * row's preview line is a *rendering* of `lastMessage` (channel rows prefix the sender, DM rows do
+ * not, a deleted newest message says so), and the client already owns that rule. Shipping a string
+ * as well would be a second source of truth for it — and one that cannot be re-derived when the
+ * message it describes is edited, deleted, or replaced by an older one.
  */
 export interface RealtimeConversationActivity {
   conversationId: string
   unreadCount: number
   lastActivityAt: string
-  preview: string
+  /** Newest live message, or null when the conversation has none. */
+  lastMessage: RealtimeMessage | null
 }
 
 export interface SocketReadyPayload {

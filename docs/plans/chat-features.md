@@ -199,12 +199,18 @@ Two rules that are easy to get wrong and are therefore stated here:
 join a room and receive its traffic. That was verified by hand during scaffolding and
 becomes an automated case under P13.
 
-> **As built — one correction.** The `message:deleted` payload grew a `conversation` field
+> **As built — two corrections.** The `message:deleted` payload grew a `conversation` field
 > (`RealtimeConversationActivity`), so the peer can correct its list row — preview, activity
 > time and badge — without a refetch, exactly as `message:created` does. Shipping only
 > `{ conversationId, messageId }` left the row showing the text of a message the stream had
 > already replaced with a placeholder. The `conversation:activity` emit to the _other_
 > members on delete is what the same payload also covers.
+>
+> `conversation:activity` also carries `lastMessage` (the message itself) rather than the
+> `preview` string the table above lists. The preview line is a rendering of `lastMessage` — a
+> channel row prefixes the sender, a DM row does not, a deleted newest message says so — and the
+> client already owned that rule for the first load. A server-flattened string was a second source
+> of truth that no later delete could correct. See D24.
 
 ## 7. Modules
 

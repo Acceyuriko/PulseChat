@@ -52,8 +52,10 @@ export function conversationLabel(
 /**
  * The preview line under the name.
  *
- * A deleted newest message says so rather than showing a body nobody may read any more — the same
- * wording the server puts in its socket `preview`, so the two agree.
+ * The rule lives here once, because both paths deliver the same thing: the query selects
+ * `lastMessage` on first load, and the socket's `conversation:activity` carries it afterwards. A
+ * deleted newest message says so rather than showing a body nobody may read any more — a guard
+ * rather than a live case, since the server's `lastMessage` resolver skips soft-deleted rows.
  *
  * The body is reduced to plain text because the row is a one-line summary: a preview showing
  * `**bold**` or `[@Devon Lane](mention:…)` would leak the wire format into the list. The markdown

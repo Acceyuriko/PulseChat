@@ -147,7 +147,13 @@ export type MutationSendMessageArgs = {
 
 export type Query = {
   __typename?: 'Query';
-  /** Null when the conversation does not exist, or when the caller is not a member. */
+  /**
+   * A single conversation, for the pane that shows one at a time.
+   *
+   * Fails with `NOT_FOUND` — not `null` — when the conversation does not exist **or** when the caller
+   * is not a member. The two cases are deliberately indistinguishable: reporting "exists but not
+   * yours" would make this an enumeration oracle for every conversation id in the database. See D23.
+   */
   conversation?: Maybe<Conversation>;
   /** Conversations the current user takes part in, most recently active first. */
   conversations: Array<Conversation>;

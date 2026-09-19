@@ -17,7 +17,7 @@ Built as a staged assignment: a scaffold carrying one vertical slice first, then
 | Realtime                 | Working — socket.io push, room fan-out, server-computed unread counts, no refetch on receive            |
 | Frontend                 | Working — three-column shell, live conversation list, message stream, composer with markdown + mentions |
 | Markdown                 | Working — a subset parsed to an AST and rendered as React nodes; no `innerHTML` anywhere in the path    |
-| Tests                    | Working — 212 (93 API incl. real-MongoDB integration + socket contract, 119 web)                        |
+| Tests                    | Working — 220 (94 API incl. real-MongoDB integration + socket contract, 126 web)                        |
 | Tooling                  | Working — ESLint (type-aware), Prettier, GraphQL Codegen, husky + lint-staged + commitlint, Vitest      |
 
 ---
@@ -154,7 +154,7 @@ To build for production instead, `pnpm build` emits the API to `apps/api/dist` a
 
 ### The seed's shape
 
-11 users, 8 conversations (5 channels, 3 DMs), 26 messages. Two rows carry unread badges, one message carries a quote, one carries a mention, and the channel conversations have several members each — so the mention dropdown has something to filter and the avatar collage has something to overlap.
+11 users, 8 conversations (5 channels, 3 DMs), 30 messages. Two rows carry unread badges — the design's `3` and `6`, the latter on the row whose preview is a mention — one message carries a quote, one carries a mention, and the channel conversations have several members each, so the mention dropdown has something to filter and the avatar collage has something to overlap.
 
 Timestamps are backdated through `MessageModel.collection.updateOne` rather than set on the documents, because Mongoose stamps its own `updatedAt` on any write it performs (see D19).
 
@@ -248,7 +248,12 @@ The server uses `mappers`, which decouples the GraphQL object types from the Mon
 
 ### Testing
 
-`pnpm test` runs Vitest in both apps — **212 tests**: 93 in the API (12 unit, 7 integration, plus the socket contract) and 119 in the web app.
+`pnpm test` runs Vitest in both apps — **220 tests**: 94 in the API (12 unit, 7 integration, plus the socket contract) and 126 in the web app.
+
+Two seams get a test each, because both are invisible to a type checker and to an ordinary unit test:
+
+- **The cache key.** `MessageStream` reads `MessagesQuery` with `{ conversationId, limit: 50 }`, and Apollo keys a cache entry by document _and_ variables. `write.test.ts` runs the socket handler's write, the stream's read, and a write under a _different_ variable set (which must miss) against one real `InMemoryCache`, so the two variable sets are checked against each other rather than assumed equal.
+- **The mount order.** The Express app and socket.io share one `http.Server`, and socket.io's `attach` snapshots the server's `request` listeners at call time — so the app has to be mounted first. The regression test fetches the browser's polling handshake (`GET /socket.io/?EIO=4&transport=polling`) and then asserts `/health` still answers, because a websocket-only client never makes that request.
 
 Unit tests (identity parsing, DTO mapping, error codes, the markdown parser, mention round trips, quote snapshots, unread derivation, cache writes, row naming) need no database. Anything that needs MongoDB lives in a `*.integration.test.ts` file and **skips itself with a printed reason** when the database is unreachable, so a clone without MongoDB still gives a green run — with the skipped count visible, never silently passing:
 

@@ -28,7 +28,14 @@ interface ExpressLikeRequest {
 }
 
 export interface BuildContextOptions {
-  emitter?: RealtimeEmitter
+  /**
+   * Resolves the emitter **per request** rather than capturing it once at build time.
+   *
+   * The indirection exists for one reason: the Express app has to be mounted before socket.io is
+   * attached, so the emitter does not exist yet when the context builder is created. See the
+   * ordering note in `src/index.ts`.
+   */
+  emitter?: () => RealtimeEmitter
 }
 
 /**
@@ -41,9 +48,10 @@ export interface BuildContextOptions {
 export function createContextBuilder(
   options: BuildContextOptions = {},
 ): ({ req }: { req: ExpressLikeRequest }) => Promise<GraphQLContext> {
-  const emitter = options.emitter ?? NOOP_EMITTER
+  const resolveEmitter = options.emitter ?? (() => NOOP_EMITTER)
 
   return async ({ req }) => {
+    const emitter = resolveEmitter()
     const userId = readIdentityHeader(req.headers)
 
     if (userId === null || !isValidObjectId(userId)) {

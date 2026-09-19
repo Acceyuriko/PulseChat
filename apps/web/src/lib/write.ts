@@ -1,4 +1,5 @@
 import type { ApolloCache } from '@apollo/client'
+import type { ModifierDetails } from '@apollo/client/cache'
 import type { RealtimeConversationActivity, RealtimeMessage } from '@pulsechat/shared/realtime'
 
 import type { ConversationFieldsFragment, MessageFieldsFragment } from '../gql/graphql'
@@ -115,6 +116,15 @@ export interface MessagesVariables {
 }
 
 /**
+ * The `limit` `MessageStream` queries with, and the one the socket write has to reuse.
+ *
+ * Apollo keys a query by **document *and* variables**, so this number is part of the write's
+ * contract rather than a detail of the read: `{ conversationId }` and `{ conversationId, limit }`
+ * are two different cache entries. One definition, imported by both sides, is what keeps them equal.
+ */
+export const MESSAGES_QUERY_LIMIT = 50
+
+/**
  * Applies `message:created` to the open conversation's message list.
  *
  * If the conversation has never been opened in this tab there is nothing to merge into, and the
@@ -165,6 +175,11 @@ export function applyMessageDeleted(
 /**
  * Applies a `RealtimeConversationActivity` payload to one conversation entity.
  *
+ * `lastMessage` is written as a reference to the same normalised `Message` entity the stream uses,
+ * which is what keeps the row's preview line and the message list from disagreeing: both read one
+ * object. Writing it also means the preview is *derived* by the row component from real message
+ * data, rather than being a server-flattened string the client would have to take on trust.
+ *
  * Returns `false` when the conversation is not in the cache at all. There is deliberately no
  * fallback write: fabricating a row from an activity payload would produce a list entry whose
  * title, members and kind nobody ever fetched.
@@ -185,6 +200,25 @@ export function applyConversationActivity(
         return activity.lastActivityAt ?? current
       },
       unreadCount: () => activity.unreadCount,
+      /**
+       * A reference rather than an inlined object: `Message` is normalised on `id`, so handing over
+       * the reference means a later delete reaches this row through the same entity.
+       *
+       * `mergeIntoStore` is **on**: with the default the reference is created but the message's own
+       * fields are never written, leaving `Conversation.lastMessage` pointing at an empty entity and
+       * the row's read failing as incomplete.
+       *
+       * `toReference` returns `undefined` when the cache cannot key the object. Returning `undefined`
+       * from a modifier means "leave this field alone", which is the safe outcome: the row keeps the
+       * preview it had rather than being blanked by a payload the cache refused.
+       */
+      lastMessage: (_current: unknown, { toReference }: ModifierDetails) => {
+        if (activity.lastMessage === null) {
+          return null
+        }
+
+        return toReference(toCacheMessage(activity.lastMessage), true) ?? undefined
+      },
     },
   })
 

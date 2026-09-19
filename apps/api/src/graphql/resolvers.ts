@@ -456,7 +456,7 @@ export const resolvers: Resolvers = {
  * Builds one recipient's activity payload, loading the live messages the count is derived from.
  *
  * Centralised so `sendMessage`, `deleteMessage` and `markConversationRead` cannot disagree about
- * how an unread count or a preview is computed.
+ * the unread count, or about which message counts as the newest.
  */
 async function buildActivityFor(
   conversation: ConversationDTO,

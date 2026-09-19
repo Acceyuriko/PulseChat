@@ -11,7 +11,7 @@ import {
  * The client-side markdown subset parser.
  *
  * The server has its own copy in `apps/api/src/domain/markdown.ts`, producing the same AST for the
- * seed previews and the quote excerpts. They are not shared code because they are consumed by
+ * quote excerpts. They are not shared code because they are consumed by
  * different runtimes and the *grammar* is what is shared — `@pulsechat/shared/markdown` declares the
  * markers, and both parsers obey them. Duplicating a ~150-line pure function across a process
  * boundary is a smaller sin than making the browser import from `node:fs`'s package graph

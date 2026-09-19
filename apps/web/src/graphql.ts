@@ -56,9 +56,9 @@ export const ConversationFields = graphql(/* GraphQL */ `
  * The list query.
  *
  * No `@client` preview field: the preview line is derived in the row component from `lastMessage`
- * using the same two rules the server's own preview uses (a channel preview gets a `Sender: `
- * prefix, a DM's does not). Deriving it here keeps one source of truth for the rule; the server
- * computes its own `preview` only because a socket activity payload has no `lastMessage` in it.
+ * (a channel preview gets a `Sender: ` prefix, a DM's does not). One rule in one place — the socket
+ * activity payload carries the same `lastMessage`, so there is no second, server-flattened version
+ * of the line for the two to disagree about.
  */
 export const ConversationsQuery = graphql(/* GraphQL */ `
   query Conversations {

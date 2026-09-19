@@ -76,20 +76,34 @@ describe('mergeMessage', () => {
     expect(result[0]?.body).toBe('from-the-server')
   })
 
-  it('inserts a late-arriving older message before newer ones', () => {
-    const existing = [{ id: 'm2', createdAt: '2026-09-18T11:00:00.000Z' }]
-
-    const result = mergeMessage(existing, { id: 'm1', createdAt: '2026-09-18T09:00:00.000Z' })
-
-    expect(result.map((message) => message.id)).toEqual(['m1', 'm2'])
-  })
-
-  it('appends a message that is newer than everything present', () => {
+  it('puts a message newer than everything present at the front', () => {
+    // The array is the server's order — newest first — so the front is the newest message.
+    // `MessageStream` reverses it for display: an arrival that lands at the back of this array
+    // renders at the oldest end of the stream.
     const existing = [{ id: 'm1', createdAt: '2026-09-18T09:00:00.000Z' }]
 
     const result = mergeMessage(existing, { id: 'm2', createdAt: '2026-09-18T11:00:00.000Z' })
 
-    expect(result.map((message) => message.id)).toEqual(['m1', 'm2'])
+    expect(result.map((message) => message.id)).toEqual(['m2', 'm1'])
+  })
+
+  it('inserts a late-arriving older message after the newer ones', () => {
+    const existing = [{ id: 'm2', createdAt: '2026-09-18T11:00:00.000Z' }]
+
+    const result = mergeMessage(existing, { id: 'm1', createdAt: '2026-09-18T09:00:00.000Z' })
+
+    expect(result.map((message) => message.id)).toEqual(['m2', 'm1'])
+  })
+
+  it('inserts between two messages when it belongs there', () => {
+    const existing = [
+      { id: 'newer', createdAt: '2026-09-18T15:00:00.000Z' },
+      { id: 'older', createdAt: '2026-09-18T09:00:00.000Z' },
+    ]
+
+    const result = mergeMessage(existing, { id: 'middle', createdAt: '2026-09-18T12:00:00.000Z' })
+
+    expect(result.map((message) => message.id)).toEqual(['newer', 'middle', 'older'])
   })
 
   it('does not mutate the input array', () => {
@@ -229,8 +243,8 @@ describe('cache writes vs what the components read', () => {
     )
 
     // The positive half: the write uses the same variables the stream reads with, so the message
-    // lands in the entry the stream reads.
-    expect(readStream(cache)?.messages.map((message) => message.id)).toEqual(['m1', 'm2'])
+    // lands in the entry the stream reads — at the front, because the array is newest-first.
+    expect(readStream(cache)?.messages.map((message) => message.id)).toEqual(['m2', 'm1'])
   })
 
   it('a write under different variables misses the entry MessageStream reads', () => {

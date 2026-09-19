@@ -60,6 +60,11 @@ interface IdentifiableMessage {
 /**
  * Inserts or replaces one message, keyed by id.
  *
+ * **The array is in the server's order: newest first.** `MessageStream` reverses it for display,
+ * so the *front* of this array is the newest message and the *back* is the oldest — an insert
+ * has to keep it that way. Getting the direction wrong puts the arriving message at the far end
+ * of the stream, which is a bug you can only see, not assert on the append alone.
+ *
  * The replace branch is not a nicety — it is the fix for the sender-echo problem. The server fans
  * `message:created` out to the whole conversation room, which **includes the sender's own socket**,
  * so an append would render the message the user just sent a second time. Merging by id makes the
@@ -74,12 +79,12 @@ export function mergeMessage<T extends IdentifiableMessage>(existing: readonly T
     return existing.map((message, position) => (position === index ? next : message))
   }
 
+  // The insertion point is the first message *older* than the incoming one. When there is none,
+  // the incoming message is the oldest present and belongs at the back — not the front.
   const nextAt = Date.parse(next.createdAt) || 0
-  const insertAt = existing.findIndex((message) => (Date.parse(message.createdAt) || 0) > nextAt)
+  const insertAt = existing.findIndex((message) => (Date.parse(message.createdAt) || 0) < nextAt)
   const merged = [...existing]
 
-  // Inserted at its chronological position rather than appended: a message that arrives after an
-  // optimistic one, or out of order on a reconnect, must not land at the wrong end of the stream.
   if (insertAt === -1) {
     merged.push(next)
   } else {

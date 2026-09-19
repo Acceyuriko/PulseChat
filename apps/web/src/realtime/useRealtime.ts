@@ -16,6 +16,7 @@ import {
   applyMessageDeleted,
   reorderConversations,
 } from '../lib/write'
+import { resyncRealtimeQueries } from './resync'
 
 const realtimeUrl = import.meta.env.VITE_REALTIME_URL ?? 'http://localhost:4000'
 
@@ -64,11 +65,16 @@ export interface UseRealtimeOptions {
 /**
  * Opens the socket for the selected identity and writes every event into the Apollo cache.
  *
- * Two decisions worth stating, both from the plan:
+ * Three decisions worth stating:
  *
- *  - **No handler refetches.** Each event patches the normalised cache directly (`lib/write.ts`).
- *    A refetch after an event would leave socket.io decorative: the data would still arrive by
- *    polling HTTP, and the realtime requirement would be satisfied on paper only (P8).
+ *  - **No event handler refetches.** Each event patches the normalised cache directly
+ *    (`lib/write.ts`). A refetch after an event would leave socket.io decorative: the data would
+ *    still arrive by polling HTTP, and the realtime requirement would be satisfied on paper only
+ *    (P8).
+ *
+ *  - **A reconnect resyncs** (`resync.ts`). Events resume the *stream*; they cannot deliver what
+ *    was emitted to nobody while the connection was down, so the client reads that back from the
+ *    server. Not an exception to the rule above — a gap has no event to react to.
  *
  *  - **The cache writes are idempotent.** The server fans `message:created` out to the whole
  *    conversation room, so the sender receives their own message back; the merge is keyed by id, so
@@ -132,10 +138,25 @@ export function useRealtime({ userId, activeConversationId }: UseRealtimeOptions
       report(userId, 'connected', payload.joinedRooms.join(', '))
     })
 
-    // `connect` also fires on every reconnect; on first connect it is what publishes the socket to
-    // the subscribe effect. Re-joining the conversation room after a reconnect is owned by that
-    // effect, which knows the current `activeConversationId`.
-    next.on('connect', publish)
+    /**
+     * `connect` fires on the first connection and on every reconnect. Two different jobs hang off
+     * it, which is why they read as one handler:
+     *
+     *  - `publish` hands the socket to the subscribe effect, which re-joins the open conversation's
+     *    room — that effect owns `activeConversationId`, so it is where the re-join belongs;
+     *  - the resync reads back what the server emitted to nobody while the connection was down.
+     *
+     * It runs on the first connection too, rather than tracking a "has connected before": the
+     * initial reads are sent before the room is joined, so they have the same small window, and
+     * one unconditional rule is easier to keep true than a flag.
+     *
+     * The re-join resumes the stream, the resync closes the gap, and a message caught by both is
+     * written once — the merges are keyed by id.
+     */
+    next.on('connect', () => {
+      publish()
+      void resyncRealtimeQueries(client)
+    })
 
     next.on(SOCKET_EVENTS.error, (payload) => {
       if (!cancelled) {

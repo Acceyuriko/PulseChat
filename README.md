@@ -4,6 +4,10 @@ A realtime chat application in a pnpm monorepo: **React + GraphQL + MongoDB + so
 
 Built as a staged assignment: a scaffold carrying one vertical slice first, then the messaging features on top of a frozen realtime contract.
 
+![The chat screen: three-column shell, conversation list with unread badges, message stream and composer](./docs/screenshots/01-conversation.png)
+
+The screenshots are of a running instance with seeded data. `docs/screenshots/` also carries the composer mid-quote with the mention dropdown open, the identity picker, and the frame right after a message arrives — the one where the list row, the badge and the stream have all moved over the socket with no refetch. [`docs/DEMO.md`](./docs/DEMO.md) shows all four and is also the 90-second walkthrough script.
+
 ---
 
 ## What works today
@@ -17,8 +21,25 @@ Built as a staged assignment: a scaffold carrying one vertical slice first, then
 | Realtime                 | Working — socket.io push, room fan-out, server-computed unread counts, no refetch on receive            |
 | Frontend                 | Working — three-column shell, live conversation list, message stream, composer with markdown + mentions |
 | Markdown                 | Working — a subset parsed to an AST and rendered as React nodes; no `innerHTML` anywhere in the path    |
-| Tests                    | Working — 220 (94 API incl. real-MongoDB integration + socket contract, 126 web)                        |
+| Tests                    | Working — 224 (94 API incl. real-MongoDB integration + socket contract, 130 web)                        |
 | Tooling                  | Working — ESLint (type-aware), Prettier, GraphQL Codegen, husky + lint-staged + commitlint, Vitest      |
+
+---
+
+## Against the assignment
+
+The brief asked for React + TypeScript, Node.js + TypeScript, GraphQL and MongoDB — see [Stack](#stack) — and six features:
+
+| #   | Requirement                                                     | Status | How it is done                                                                                                                                                                                                                                          | Where to look                                                                                                                  |
+| --- | --------------------------------------------------------------- | ------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
+| 1   | Web UI according to the design (not required to be 100%)        | done   | Three-column shell, dark palette and Inter taken from the Figma file's tokens; the community modules the design draws but the brief never asks for stay static. Elements that would need an upload or a second screen are not rendered at all.          | `apps/web/src/shell/`, `apps/web/src/components/`, the token block in `apps/web/src/index.css`                                 |
+| 2   | Essential chat feature over socket.io or another realtime layer | done   | Send, delete and mark-as-read are GraphQL mutations; socket.io pushes the result to `conversation:<id>` and to each member's `user:<id>`. The client writes the Apollo cache on arrival — there is no refetch, which is what the realtime panel counts. | `apps/api/src/realtime/server.ts`, `apps/web/src/realtime/`, `apps/web/src/lib/write.ts`                                       |
+| 3   | Unread count (optional)                                         | done   | Derived, never stored: `messages after your read cursor, from someone else, not deleted`. Computed server-side per recipient at emit time, so it cannot drift between tabs.                                                                             | `apps/api/src/domain/unread.ts`, the `unreadCount` field resolver in `apps/api/src/graphql/resolvers.ts`                       |
+| 4   | Quote reply — database model and related API (optional)         | done   | `Message.replyTo` stores a frozen snapshot (`messageId, senderId, senderDisplayName, bodyExcerpt, createdAt`), not a foreign key: no joins on the read path and the card survives the quoted message being deleted.                                     | `apps/api/src/models/message.ts`, `apps/api/src/domain/quote.ts`, `sendMessage` in `apps/api/src/graphql/resolvers.ts`         |
+| 5   | Mention someone (optional)                                      | done   | A mention is an inline markdown link, `[@Name](mention:<userId>)`, built with `formatMention()`. The candidates are the conversation's members; nothing is stored twice — `Message.mentions` is a field resolver over `body`.                           | `packages/shared/src/markdown.ts`, `apps/web/src/features/messages/mentions.ts`, `apps/web/src/features/composer/Composer.tsx` |
+| 6   | Frontend and backend unit tests (optional)                      | done   | 224 tests in three layers: pure logic with no database, integration against a real MongoDB, and the socket contract against a real HTTP server and a real `socket.io-client`.                                                                           | `pnpm test`; counts and the seams each layer covers are under [Testing](#testing)                                              |
+
+Two notes on the two items that are deliberately partial. The **socket contract** is covered by automated tests rather than only by hand: payload shape, room isolation, the sender's own echo, and the per-recipient `unreadCount` are all assertions. And **requirement 1** is where "not 100%" is spent: threads, attachments, search, pagination, reactions, message edit, presence, typing indicators and theming are all absent, each for a stated reason in [Deliberate omissions](#deliberate-omissions) — the design drew no frame for most of them.
 
 ---
 
@@ -248,7 +269,7 @@ The server uses `mappers`, which decouples the GraphQL object types from the Mon
 
 ### Testing
 
-`pnpm test` runs Vitest in both apps — **220 tests**: 94 in the API (12 unit, 7 integration, plus the socket contract) and 126 in the web app.
+`pnpm test` runs Vitest in both apps — **224 tests**: 94 in the API (64 unit, 19 integration, 11 socket contract) and 130 in the web app.
 
 Two seams get a test each, because both are invisible to a type checker and to an ordinary unit test:
 
@@ -292,5 +313,6 @@ These are choices, not gaps. Each one is in the design and out of the assignment
 ## Further reading
 
 - [`docs/DECISIONS.md`](./docs/DECISIONS.md) — why each choice was made, and what was rejected
+- [`docs/DEMO.md`](./docs/DEMO.md) — the screenshots annotated, plus the 90-second walkthrough script
 - [`docs/plans/chat-features.md`](./docs/plans/chat-features.md) — the messaging plan, its milestones, and the design inventory taken from Figma
 - [`AGENTS.md`](./AGENTS.md) — conventions for working in this repository

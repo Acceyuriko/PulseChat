@@ -25,6 +25,10 @@ export default tseslint.config(
       'apps/api/src/generated/**',
       'apps/web/src/gql/**',
       'pnpm-lock.yaml',
+      // Local assistant notes and probe scripts. Git and Prettier already ignore this
+      // directory; ESLint is the odd one out, and the probes are browser/Node scripts that
+      // no tsconfig covers.
+      '.workbuddy/**',
     ],
   },
 

@@ -132,8 +132,9 @@ export function useRealtime({ userId, activeConversationId }: UseRealtimeOptions
       report(userId, 'connected', payload.joinedRooms.join(', '))
     })
 
-    // A reconnect must re-publish: socket.io drops room membership on disconnect and does not
-    // replay it, so the subscribe effect has to be given the chance to re-join.
+    // `connect` also fires on every reconnect; on first connect it is what publishes the socket to
+    // the subscribe effect. Re-joining the conversation room after a reconnect is owned by that
+    // effect, which knows the current `activeConversationId`.
     next.on('connect', publish)
 
     next.on(SOCKET_EVENTS.error, (payload) => {
@@ -211,15 +212,28 @@ export function useRealtime({ userId, activeConversationId }: UseRealtimeOptions
    * Its own effect rather than part of the connection one: `activeConversationId` changes far more
    * often than the identity does, and folding this in would tear down and rebuild the socket on
    * every conversation switch.
+   *
+   * The subscribe is re-sent on every `connect`, not once per effect run. socket.io drops a
+   * socket's rooms when it disconnects and never replays them, so after any reconnect — an API
+   * restart is enough — a socket that does not re-subscribe stays outside its conversation room
+   * for the rest of the page's life. The failure is quiet: rows and badges keep updating (they
+   * ride the user room, which the server re-joins on connect), while the open conversation's
+   * message stream silently stops receiving. Re-emitting here is what repairs it.
    */
   useEffect(() => {
     if (socket === null || activeConversationId === null) {
       return
     }
 
-    socket.emit(SOCKET_EVENTS.conversationSubscribe, activeConversationId)
+    const subscribe = () => {
+      socket.emit(SOCKET_EVENTS.conversationSubscribe, activeConversationId)
+    }
+
+    subscribe()
+    socket.on('connect', subscribe)
 
     return () => {
+      socket.off('connect', subscribe)
       socket.emit(SOCKET_EVENTS.conversationUnsubscribe, activeConversationId)
     }
   }, [socket, activeConversationId])

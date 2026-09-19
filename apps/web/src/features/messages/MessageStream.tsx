@@ -184,7 +184,7 @@ function dayLabel(at: Date): string {
     return 'Yesterday'
   }
 
-  return at.toLocaleDateString(undefined, {
+  return at.toLocaleDateString('en-US', {
     weekday: 'long',
     month: 'long',
     day: 'numeric',

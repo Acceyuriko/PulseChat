@@ -220,16 +220,16 @@ function formatListTimestamp(value: string): string {
   const sameDay = at.toDateString() === now.toDateString()
 
   if (sameDay) {
-    return at.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })
+    return at.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false })
   }
 
   const days = (now.getTime() - at.getTime()) / 86_400_000
 
   if (days < 7) {
-    return at.toLocaleDateString(undefined, { weekday: 'short' })
+    return at.toLocaleDateString('en-US', { weekday: 'short' })
   }
 
-  return at.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
+  return at.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
 }
 
 function SearchGlyph() {

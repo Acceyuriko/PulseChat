@@ -63,9 +63,10 @@ export function RealtimePanel({ state }: { state: RealtimeState }) {
 }
 
 function formatClock(at: Date): string {
-  return at.toLocaleTimeString(undefined, {
+  return at.toLocaleTimeString('en-US', {
     hour: '2-digit',
     minute: '2-digit',
     second: '2-digit',
+    hour12: false,
   })
 }

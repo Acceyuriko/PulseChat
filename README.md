@@ -6,7 +6,7 @@ Built as a staged assignment: a scaffold carrying one vertical slice first, then
 
 ![The chat screen: three-column shell, conversation list with unread badges, message stream and composer](./docs/screenshots/01-conversation.png)
 
-The screenshots are of a running instance with seeded data. `docs/screenshots/` also carries the composer mid-quote with the mention dropdown open, the identity picker, and the frame right after a message arrives — the one where the list row, the badge and the stream have all moved over the socket with no refetch. [`docs/DEMO.md`](./docs/DEMO.md) shows all four and is also the 90-second walkthrough script.
+The screenshots are of a running instance with seeded data. `docs/screenshots/` also carries the composer mid-quote with the mention dropdown open, the identity picker, and the frame right after a message arrives — the one where the list row, the badge and the stream have all moved over the socket with no refetch.
 
 ---
 
@@ -313,6 +313,5 @@ These are choices, not gaps. Each one is in the design and out of the assignment
 ## Further reading
 
 - [`docs/DECISIONS.md`](./docs/DECISIONS.md) — why each choice was made, and what was rejected
-- [`docs/DEMO.md`](./docs/DEMO.md) — the screenshots annotated, plus the 90-second walkthrough script
 - [`docs/plans/chat-features.md`](./docs/plans/chat-features.md) — the messaging plan, its milestones, and the design inventory taken from Figma
 - [`AGENTS.md`](./AGENTS.md) — conventions for working in this repository

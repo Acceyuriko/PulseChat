@@ -213,6 +213,8 @@ Two rules that follow, and are enforced by tests rather than comments:
 
 All of these writes live in `apps/web/src/lib/write.ts`, one file, so they are unit-testable without a socket and reviewable in one pass.
 
+**The boundary of "no refetch" is events, not reads.** `message:created` fans out to the conversation room only, so a message sent while the tab had a different conversation open never reached the socket handler — the cached `messages` entry for that conversation is stale by construction, and no amount of socket fidelity repairs it. Re-entering the conversation therefore revalidates: `MessageStream` reads with `fetchPolicy: 'cache-and-network'`, which renders the cached rows instantly and reconciles with the server in the background. The fetch rides the **navigation**, not a socket event, so the decision above is untouched — the open conversation still runs entirely on socket cache patches with zero network traffic. The conversations list keeps `cache-first` because its rows _are_ kept current by the user room's `conversation:activity`, which every tab receives.
+
 ### D25 — The Express app is mounted before socket.io is attached
 
 `httpServer.on('request', createApp(...))` runs **before** `attachRealtime(httpServer)`. The order is load-bearing.

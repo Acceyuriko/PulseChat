@@ -135,7 +135,9 @@ export const MESSAGES_QUERY_LIMIT = 50
  * If the conversation has never been opened in this tab there is nothing to merge into, and the
  * handler returns the data untouched. That is correct rather than lazy: `messages` is paginated and
  * a partial list written here would have no pagination context, while the list row still updates
- * through `conversation:activity` and the stream is fetched in full when the conversation opens.
+ * through `conversation:activity` and the stream is reconciled with the server when the
+ * conversation opens — `MessageStream` reads `cache-and-network` precisely because this handler
+ * cannot fire for a conversation the tab is not looking at.
  */
 export function applyMessageCreated(
   cache: ApolloCache,

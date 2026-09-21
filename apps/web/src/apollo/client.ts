@@ -53,6 +53,12 @@ export function createApolloClient(userId: string | null): ApolloClient {
      * which would make switching conversations a spinner — and would hide a broken socket behind a
      * working poll. With `cache-first`, a stale list is *evidence* that the realtime path failed,
      * which is what a reviewer needs to see. The socket keeps the cache current (P8).
+     *
+     * One deliberate exception: `MessageStream` reads `cache-and-network`. `message:created` is
+     * fan-out to the conversation room, so messages sent while a *different* conversation was open
+     * never reached this tab — no socket fidelity can keep a room's entry current for a
+     * conversation nobody is watching, and a cache-first read on re-entry would serve that stale
+     * entry forever. The fetch rides the navigation, not an event, so D24 still holds.
      */
     defaultOptions: {
       watchQuery: { fetchPolicy: 'cache-first', nextFetchPolicy: 'cache-first' },

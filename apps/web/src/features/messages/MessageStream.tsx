@@ -41,6 +41,19 @@ export function MessageStream({
 }: MessageStreamProps) {
   const { data, loading, error } = useQuery(MessagesQuery, {
     variables: { conversationId, limit: MESSAGES_QUERY_LIMIT },
+    /**
+     * `cache-and-network`, deliberately against the client-wide `cache-first` default.
+     *
+     * `message:created` fans out to the conversation room only, so a message sent while this tab
+     * had a *different* conversation open never reached the socket handler — the cache entry for
+     * this query went stale the moment the user navigated away. A cache-first read on re-entry
+     * would serve that stale entry and never ask the server: the list row (patched via the user
+     * room) shows the new message while the stream below ends one message short. This is not an
+     * exception to D24 — no socket event triggers a refetch; the fetch rides the *navigation*, the
+     * cached data still renders instantly, and live updates for the open conversation keep arriving
+     * through socket cache patches with no network traffic.
+     */
+    fetchPolicy: 'cache-and-network',
   })
 
   const messages = useMemo(() => {

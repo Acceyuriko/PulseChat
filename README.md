@@ -10,6 +10,14 @@ The screenshots are of a running instance with seeded data. `docs/screenshots/` 
 
 ---
 
+## Demo
+
+A screen recording of the running app, narrated in Chinese — **[`DemoVideoIntro.mp4`](./DemoVideoIntro.mp4)** (1:41, 32 MB), at the repository root.
+
+Two browser windows side by side, one identity each, over the same seeded data: the same DM open from both ends, a message leaving one window and arriving in the other with no refetch — the realtime panel at the bottom counts the events that carried it — then a quote reply mirrored the same way, and a mention rendered in the stream.
+
+---
+
 ## What works today
 
 | Area                     | State                                                                                                   |

@@ -1,0 +1,18 @@
+"""
+An ISO-8601 timestamp on the wire, a JavaScript `Date` on the server.
+"""
+scalar DateTime
+
+type Query {
+  "Liveness probe for the GraphQL layer itself."
+  health: String!
+}
+
+"""
+Declared here, empty, purely so domain files can `extend` it.
+
+GraphQL requires the base type to exist before anything extends it — `extend type Mutation`
+without a `Mutation` declaration is an SDL validation error at schema build time, not at query
+time, so the process refuses to boot.
+"""
+type Mutation

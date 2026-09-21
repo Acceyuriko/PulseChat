@@ -1,0 +1,79 @@
+@import 'tailwindcss';
+
+/**
+ * Design tokens from the Figma inventory (docs/plans/chat-features.md, Appendix A and P12).
+ *
+ * Declared once in `@theme` so every component references a token name rather than a hex literal —
+ * a palette scattered across components is a palette that drifts.
+ *
+ * Naming follows the design's own labels where it had them (`card`, `card-2`, `highlight-2`) so a
+ * value can be traced back to the source file.
+ */
+@theme {
+  /* Surfaces */
+  --color-canvas: #0c0e13;
+  --color-card: #1d1c21;
+  --color-card-2: #26252d;
+  --color-highlight-2: #454451;
+  --color-popover: #35343e;
+
+  /* Text */
+  --color-content: #c9c7d0;
+  --color-content-muted: #7b798f;
+
+  /* Accents */
+  --color-warning: #fe3438;
+  --color-outgoing: #82d8be;
+  --color-outgoing-ink: #0c0e13;
+
+  --color-hairline: #2b2a32;
+
+  /* Radii in use in the design: 6, 8, 10, 50, 100. */
+  --radius-bubble: 8px;
+  --radius-control: 10px;
+  --radius-popover: 6px;
+  --radius-pill: 50px;
+  --radius-badge: 100px;
+
+  /**
+   * Inter, self-hosted (see the `@font-face` below). The stack keeps a system fallback so a missing
+   * font file degrades to something readable rather than to a serif.
+   */
+  --font-sans:
+    'Inter', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue',
+    sans-serif;
+}
+
+/**
+ * Self-hosted Inter.
+ *
+ * A CDN import would break the "clone and run" guarantee the repo promises — the app would need
+ * the network to look right, and every screenshot would depend on an external host.
+ *
+ * `font-display: swap` means text renders immediately in the fallback and reflows once Inter
+ * loads, rather than staying invisible.
+ */
+@font-face {
+  font-family: 'Inter';
+  font-style: normal;
+  font-weight: 100 900;
+  font-display: swap;
+  src: url('/fonts/inter-latin.woff2') format('woff2');
+  unicode-range:
+    U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+2000-206F, U+2074,
+    U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  background-color: var(--color-canvas);
+  color: var(--color-content);
+  font-family: var(--font-sans);
+  /* The design is a fixed three-column shell; the panes own their own scrolling. */
+  overflow: hidden;
+}

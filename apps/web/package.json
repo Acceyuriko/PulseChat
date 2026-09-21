@@ -1,0 +1,44 @@
+{
+  "name": "@pulsechat/web",
+  "version": "0.1.0",
+  "private": true,
+  "description": "PulseChat frontend: React 19 + Vite 8 + Tailwind 4 + Apollo Client 4.",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc --noEmit && vite build",
+    "preview": "vite preview",
+    "typecheck": "tsc --noEmit",
+    "codegen": "graphql-codegen --config codegen.ts",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "dependencies": {
+    "@apollo/client": "^4.3.0",
+    "@pulsechat/shared": "workspace:*",
+    "graphql": "^16.11.0",
+    "react": "^19.3.0",
+    "react-dom": "^19.3.0",
+    "rxjs": "^7.8.2",
+    "socket.io-client": "^4.8.3"
+  },
+  "devDependencies": {
+    "@graphql-codegen/cli": "^7.4.1",
+    "@graphql-codegen/client-preset": "^6.2.0",
+    "@graphql-typed-document-node/core": "^3.2.0",
+    "@tailwindcss/vite": "^4.3.3",
+    "@testing-library/dom": "^10.4.2",
+    "@testing-library/jest-dom": "^7.0.1",
+    "@testing-library/react": "^16.3.3",
+    "@types/node": "^26.6.1",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "@vitejs/plugin-react": "^6.1.1",
+    "graphql-sock": "^1.0.1",
+    "jsdom": "^30.1.0",
+    "tailwindcss": "^4.3.3",
+    "typescript": "~6.0.3",
+    "vite": "^8.3.0",
+    "vitest": "^5.0.1"
+  }
+}

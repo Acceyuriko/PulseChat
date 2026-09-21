@@ -1,0 +1,136 @@
+"""
+What kind of conversation this is.
+
+`CHANNEL` is a named, possibly multi-member room (`title` is present).
+`DM` is a direct exchange between exactly two members (`title` is null; the client
+labels it with the other member's display name).
+
+A dedicated field rather than inferring from the member count: a two-member channel
+would otherwise be indistinguishable from a DM, and that heuristic would leak into
+every component that renders a row.
+"""
+enum ConversationKind {
+  CHANNEL
+  DM
+}
+
+"""
+One member of a conversation, together with that member's own read cursor.
+
+The cursor is what makes the unread count derivable instead of stored: there is no
+counter to drift out of sync, and no write amplification on every message.
+"""
+type ConversationMember {
+  user: User!
+  lastReadAt: DateTime
+}
+
+"""
+A frozen copy of the message a reply points at, taken when the reply is sent.
+
+Deliberately a snapshot rather than a join: the read path needs no second query, the
+card stays renderable after the quoted message is deleted, and the excerpt cannot
+change under the reader. It never contains a nested `replyTo`, so quote depth is
+always exactly one.
+"""
+type QuoteSnapshot {
+  messageId: ID!
+  senderId: ID!
+  senderDisplayName: String!
+  bodyExcerpt: String!
+  createdAt: DateTime!
+}
+
+type Conversation {
+  id: ID!
+  kind: ConversationKind!
+  "Present for `CHANNEL`, null for `DM`."
+  title: String
+  members: [ConversationMember!]!
+  "Newest message that has not been deleted. Null when every message is gone."
+  lastMessage: Message
+  """
+  Timestamp of the newest live message, falling back to `createdAt` for an empty
+  conversation. This — not `updatedAt` — is the sort key for the list.
+  """
+  lastActivityAt: DateTime!
+  "Viewer-scoped: messages newer than this member's `lastReadAt`, from anyone else."
+  unreadCount: Int!
+  createdAt: DateTime!
+  updatedAt: DateTime!
+}
+
+type Message {
+  id: ID!
+  conversationId: ID!
+  sender: User!
+  "Markdown-subset source, not opaque text. Rendered by parsing to nodes, never injected as HTML."
+  body: String!
+  replyTo: QuoteSnapshot
+  "Derived by parsing `body`, never stored a second time — one source of truth for who was mentioned."
+  mentions: [User!]!
+  createdAt: DateTime!
+  "Set on soft delete. A deleted message stays addressable so a reply to it still resolves."
+  deletedAt: DateTime
+}
+
+"Freezes the quote snapshot from the referenced message."
+input SendMessageInput {
+  conversationId: ID!
+  body: String!
+  """
+  Id of the message being quoted. The server reads it, copies what it needs into a
+  snapshot, and rejects the send when the target is missing or deleted.
+  """
+  replyToMessageId: ID
+}
+
+type SendMessagePayload {
+  message: Message!
+  "The conversation in the sender's own view, so the client does not have to guess at ordering."
+  conversation: Conversation!
+}
+
+type DeleteMessagePayload {
+  "Id of the message that was deleted, so the client can address it without a refetch."
+  messageId: ID!
+  conversationId: ID!
+  conversation: Conversation!
+}
+
+type MarkConversationReadPayload {
+  conversation: Conversation!
+  "The count after the cursor moved. Always 0 on success; returned so the client can assert it."
+  unreadCount: Int!
+}
+
+extend type Query {
+  "Conversations the current user takes part in, most recently active first."
+  conversations: [Conversation!]!
+
+  """
+  A single conversation, for the pane that shows one at a time.
+
+  Fails with `NOT_FOUND` — not `null` — when the conversation does not exist **or** when the caller
+  is not a member. The two cases are deliberately indistinguishable: reporting "exists but not
+  yours" would make this an enumeration oracle for every conversation id in the database. See D23.
+  """
+  conversation(id: ID!): Conversation
+
+  """
+  Messages of a conversation, newest first. Callers must be members.
+  Soft-deleted messages are returned (so quotes and ids stay resolvable) with
+  `deletedAt` set; the client renders a placeholder for them.
+  """
+  messages(conversationId: ID!, limit: Int = 50): [Message!]!
+}
+
+extend type Mutation {
+  sendMessage(input: SendMessageInput!): SendMessagePayload!
+
+  "Soft delete. Restricted to the sender; fails with `FORBIDDEN` otherwise."
+  deleteMessage(id: ID!): DeleteMessagePayload!
+
+  "Advances the caller's read cursor to now and returns the resulting conversation view."
+  markConversationRead(conversationId: ID!): MarkConversationReadPayload!
+}

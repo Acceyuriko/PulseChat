@@ -1,0 +1,44 @@
+{
+  "name": "@pulsechat/api",
+  "version": "0.1.0",
+  "private": true,
+  "description": "PulseChat backend: Express 5 + Apollo Server 5 + Mongoose + socket.io.",
+  "type": "module",
+  "main": "./dist/index.js",
+  "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "build": "tsc -p tsconfig.build.json",
+    "start": "node dist/index.js",
+    "typecheck": "tsc --noEmit",
+    "codegen": "graphql-codegen --config codegen.ts",
+    "seed": "tsx src/scripts/seed.ts",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "dependencies": {
+    "@apollo/server": "^5.5.1",
+    "@as-integrations/express5": "^1.1.2",
+    "@pulsechat/shared": "workspace:*",
+    "cors": "^2.8.6",
+    "dotenv": "^18.0.0",
+    "express": "^5.2.1",
+    "graphql": "^16.11.0",
+    "mongoose": "^9.10.1",
+    "socket.io": "^4.8.3"
+  },
+  "devDependencies": {
+    "@graphql-codegen/cli": "^7.4.1",
+    "@graphql-codegen/typescript": "^6.1.0",
+    "@graphql-codegen/typescript-resolvers": "^6.1.0",
+    "@types/cors": "^2.8.19",
+    "@types/express": "^5.0.6",
+    "@types/node": "^26.6.1",
+    "@types/supertest": "^7.2.1",
+    "graphql-sock": "^1.0.1",
+    "socket.io-client": "^4.8.3",
+    "supertest": "^7.2.2",
+    "tsx": "^4.23.13",
+    "typescript": "~6.0.3",
+    "vitest": "^5.0.1"
+  }
+}

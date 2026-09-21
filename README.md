@@ -21,7 +21,7 @@ The screenshots are of a running instance with seeded data. `docs/screenshots/` 
 | Realtime                 | Working — socket.io push, room fan-out, server-computed unread counts, no refetch on receive            |
 | Frontend                 | Working — three-column shell, live conversation list, message stream, composer with markdown + mentions |
 | Markdown                 | Working — a subset parsed to an AST and rendered as React nodes; no `innerHTML` anywhere in the path    |
-| Tests                    | Working — 224 (94 API incl. real-MongoDB integration + socket contract, 130 web)                        |
+| Tests                    | Working — 226 (94 API incl. real-MongoDB integration + socket contract, 132 web)                        |
 | Tooling                  | Working — ESLint (type-aware), Prettier, GraphQL Codegen, husky + lint-staged + commitlint, Vitest      |
 
 ---
@@ -37,7 +37,7 @@ The brief asked for React + TypeScript, Node.js + TypeScript, GraphQL and MongoD
 | 3   | Unread count (optional)                                         | done   | Derived, never stored: `messages after your read cursor, from someone else, not deleted`. Computed server-side per recipient at emit time, so it cannot drift between tabs.                                                                             | `apps/api/src/domain/unread.ts`, the `unreadCount` field resolver in `apps/api/src/graphql/resolvers.ts`                       |
 | 4   | Quote reply — database model and related API (optional)         | done   | `Message.replyTo` stores a frozen snapshot (`messageId, senderId, senderDisplayName, bodyExcerpt, createdAt`), not a foreign key: no joins on the read path and the card survives the quoted message being deleted.                                     | `apps/api/src/models/message.ts`, `apps/api/src/domain/quote.ts`, `sendMessage` in `apps/api/src/graphql/resolvers.ts`         |
 | 5   | Mention someone (optional)                                      | done   | A mention is an inline markdown link, `[@Name](mention:<userId>)`, built with `formatMention()`. The candidates are the conversation's members; nothing is stored twice — `Message.mentions` is a field resolver over `body`.                           | `packages/shared/src/markdown.ts`, `apps/web/src/features/messages/mentions.ts`, `apps/web/src/features/composer/Composer.tsx` |
-| 6   | Frontend and backend unit tests (optional)                      | done   | 224 tests in three layers: pure logic with no database, integration against a real MongoDB, and the socket contract against a real HTTP server and a real `socket.io-client`.                                                                           | `pnpm test`; counts and the seams each layer covers are under [Testing](#testing)                                              |
+| 6   | Frontend and backend unit tests (optional)                      | done   | 226 tests in three layers: pure logic with no database, integration against a real MongoDB, and the socket contract against a real HTTP server and a real `socket.io-client`.                                                                           | `pnpm test`; counts and the seams each layer covers are under [Testing](#testing)                                              |
 
 Two notes on the two items that are deliberately partial. The **socket contract** is covered by automated tests rather than only by hand: payload shape, room isolation, the sender's own echo, and the per-recipient `unreadCount` are all assertions. And **requirement 1** is where "not 100%" is spent: threads, attachments, search, pagination, reactions, message edit, presence, typing indicators and theming are all absent, each for a stated reason in [Deliberate omissions](#deliberate-omissions) — the design drew no frame for most of them.
 
@@ -269,7 +269,7 @@ The server uses `mappers`, which decouples the GraphQL object types from the Mon
 
 ### Testing
 
-`pnpm test` runs Vitest in both apps — **224 tests**: 94 in the API (64 unit, 19 integration, 11 socket contract) and 130 in the web app.
+`pnpm test` runs Vitest in both apps — **226 tests**: 94 in the API (64 unit, 19 integration, 11 socket contract) and 132 in the web app.
 
 Two seams get a test each, because both are invisible to a type checker and to an ordinary unit test:
 

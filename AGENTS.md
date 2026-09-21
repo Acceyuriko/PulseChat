@@ -94,6 +94,7 @@ A non-member asking for a conversation gets `NOT_FOUND`, not `FORBIDDEN` — oth
 - Every write goes through GraphQL. socket.io is server-to-client push only.
 - Never hard-code an event name. Import it from `SOCKET_EVENTS` in `@pulsechat/shared/realtime`, and add new events to the interfaces in `packages/shared/src/realtime.ts` — the `satisfies` clause makes the build fail if a constant and an interface drift apart.
 - Authorise before joining any room.
+- **An identity switch remounts the workspace.** The socket re-subscribes the open conversation on every `connect`, so a `selectedId` that survived a switch is re-sent as the _new_ user and refused with `FORBIDDEN`. See D27.
 - **The sender receives their own `message:created`** — fan-out is room-based. Any handler that appends to a list must dedupe by message id first.
 - **A socket event never triggers a refetch.** It writes the Apollo cache (`cache.updateQuery` / `cache.modify`). All such writes belong in `apps/web/src/lib/write.ts`, so they stay testable without a socket. See D24.
 - **A cache write must use the same variables the reading component does.** Apollo keys an entry by document _and_ variables, so `{ conversationId }` and `{ conversationId, limit: MESSAGES_QUERY_LIMIT }` are two different entries — writing one while a component reads the other is a silent no-op. Use the shared constants in `lib/write.ts`.

@@ -26,7 +26,15 @@ export function App() {
 
   return (
     <ApolloProvider client={apolloClient}>
-      <Workspace userId={userId} onIdentityChange={setUserId} />
+      {/*
+       * Keyed on the identity so a switch remounts the workspace and its `selectedId` resets.
+       * Without the key the selection survives, and the socket — which reconnects as the new user —
+       * immediately re-subscribes the *previous* user's open conversation. The server refuses with
+       * `FORBIDDEN`, and the pane keeps showing a conversation the new user cannot read. The
+       * remount also drops the unread total and every pane's local state, which is the same rule:
+       * nothing carries across identities.
+       */}
+      <Workspace key={userId ?? 'anonymous'} userId={userId} onIdentityChange={setUserId} />
     </ApolloProvider>
   )
 }

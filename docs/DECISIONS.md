@@ -231,6 +231,18 @@ The fake login moved from `localStorage` to `sessionStorage`.
 
 `localStorage` is shared per origin, so two tabs are always the same user. On a single machine — which is how this will be reviewed — that removes the receiving half of the demo entirely: you can never be the person the message arrives for. Per-tab identity makes the realtime path demonstrable with one browser and no second device.
 
+### D27 — An identity switch remounts the workspace
+
+`<Workspace>` is keyed on the identity, so switching users tears down the workspace and builds a new one: `selectedId`, the unread total, and every pane's local state start from zero.
+
+The failure this prevents is specific, and was reproduced before it was fixed. With the selection kept, the socket — rebuilt under the new user's handshake auth — connects, and the subscribe effect re-sends `conversation:subscribe` for the **previous** user's open conversation. That re-send is not itself wrong: it is the same mechanism that re-joins the room after any reconnect, because socket.io drops a socket's rooms on disconnect and never replays them. What was wrong is the id. The new user is not a member of that conversation, so the server answered `FORBIDDEN` on the socket, the realtime panel stuck on that error (a successful subscribe has no ack to clear it), and the pane read "Conversation not found" until something else was picked.
+
+Alternatives that were rejected:
+
+- **Filtering the subscribe client-side.** The socket layer would need to know which conversations the current identity can see, which means feeding it the list query's data — a dependency the realtime module otherwise does not have, to guard one transition.
+- **Clearing `selectedId` inside the switch handler.** It covers exactly one way of changing identity, and exactly one piece of state. The key states the rule structurally: nothing carries across identities, including state added later.
+- **Ignoring a non-member subscribe server-side.** The membership check is the authorisation boundary (D23). Silently accepting would trade a visible client bug for an invisible server one.
+
 ---
 
 ## Version landmines
